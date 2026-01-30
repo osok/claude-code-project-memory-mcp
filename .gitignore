@@ -1,0 +1,34 @@
+# Project-specific sequence documents (requirements, designs, task lists)
+# These are generated per-project and should not be in the template
+project-docs/[0-9][0-9][0-9]-*.md
+
+# Keep template files
+!project-docs/schemas/_template-schema.md
+!project-docs/adrs/_template-adr.md
+
+# Generated design docs (project-specific)
+design-docs/[0-9][0-9]-*.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+
+# Keep example env files
+!.env-example
+!.env.example
