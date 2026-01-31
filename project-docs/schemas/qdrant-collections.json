@@ -1,0 +1,509 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Qdrant Collection Configurations",
+  "description": "Configuration specifications for all Qdrant collections in the Claude Code Long-Term Memory System",
+  "version": "1.0",
+
+  "collections": {
+    "requirements_memory": {
+      "description": "Store requirement documents with semantic search capabilities",
+      "vector_config": {
+        "size": 1024,
+        "distance": "Cosine",
+        "index": "hnsw",
+        "hnsw_config": {
+          "m": 16,
+          "ef_construct": 200,
+          "full_scan_threshold": 10000,
+          "max_indexing_threads": 0,
+          "on_disk": false
+        }
+      },
+      "optimizers_config": {
+        "deleted_threshold": 0.2,
+        "vacuum_min_vector_number": 1000,
+        "default_segment_number": 0,
+        "max_segment_size": null,
+        "memmap_threshold": null,
+        "indexing_threshold": 20000,
+        "flush_interval_sec": 5,
+        "max_optimization_threads": 1
+      },
+      "wal_config": {
+        "wal_capacity_mb": 32,
+        "wal_segments_ahead": 0
+      },
+      "payload_indexes": {
+        "requirement_id": {
+          "type": "keyword"
+        },
+        "priority": {
+          "type": "keyword"
+        },
+        "status": {
+          "type": "keyword"
+        },
+        "source_document": {
+          "type": "keyword"
+        },
+        "created_at": {
+          "type": "datetime"
+        },
+        "updated_at": {
+          "type": "datetime"
+        },
+        "deleted": {
+          "type": "bool"
+        },
+        "sync_status": {
+          "type": "keyword"
+        }
+      }
+    },
+
+    "design_memory": {
+      "description": "Store architectural decisions, ADRs, and design documents",
+      "vector_config": {
+        "size": 1024,
+        "distance": "Cosine",
+        "index": "hnsw",
+        "hnsw_config": {
+          "m": 16,
+          "ef_construct": 200,
+          "full_scan_threshold": 10000,
+          "max_indexing_threads": 0,
+          "on_disk": false
+        }
+      },
+      "optimizers_config": {
+        "deleted_threshold": 0.2,
+        "vacuum_min_vector_number": 1000,
+        "default_segment_number": 0,
+        "max_segment_size": null,
+        "memmap_threshold": null,
+        "indexing_threshold": 20000,
+        "flush_interval_sec": 5,
+        "max_optimization_threads": 1
+      },
+      "wal_config": {
+        "wal_capacity_mb": 32,
+        "wal_segments_ahead": 0
+      },
+      "payload_indexes": {
+        "design_type": {
+          "type": "keyword"
+        },
+        "status": {
+          "type": "keyword"
+        },
+        "created_at": {
+          "type": "datetime"
+        },
+        "updated_at": {
+          "type": "datetime"
+        },
+        "deleted": {
+          "type": "bool"
+        },
+        "sync_status": {
+          "type": "keyword"
+        }
+      }
+    },
+
+    "code_patterns": {
+      "description": "Store implementation templates and coding conventions",
+      "vector_config": {
+        "size": 1024,
+        "distance": "Cosine",
+        "index": "hnsw",
+        "hnsw_config": {
+          "m": 16,
+          "ef_construct": 200,
+          "full_scan_threshold": 10000,
+          "max_indexing_threads": 0,
+          "on_disk": false
+        }
+      },
+      "optimizers_config": {
+        "deleted_threshold": 0.2,
+        "vacuum_min_vector_number": 1000,
+        "default_segment_number": 0,
+        "max_segment_size": null,
+        "memmap_threshold": null,
+        "indexing_threshold": 20000,
+        "flush_interval_sec": 5,
+        "max_optimization_threads": 1
+      },
+      "wal_config": {
+        "wal_capacity_mb": 32,
+        "wal_segments_ahead": 0
+      },
+      "payload_indexes": {
+        "pattern_name": {
+          "type": "keyword"
+        },
+        "pattern_type": {
+          "type": "keyword"
+        },
+        "language": {
+          "type": "keyword"
+        },
+        "created_at": {
+          "type": "datetime"
+        },
+        "updated_at": {
+          "type": "datetime"
+        },
+        "deleted": {
+          "type": "bool"
+        },
+        "sync_status": {
+          "type": "keyword"
+        }
+      }
+    },
+
+    "component_registry": {
+      "description": "Store component definitions and metadata",
+      "vector_config": {
+        "size": 1024,
+        "distance": "Cosine",
+        "index": "hnsw",
+        "hnsw_config": {
+          "m": 16,
+          "ef_construct": 200,
+          "full_scan_threshold": 10000,
+          "max_indexing_threads": 0,
+          "on_disk": false
+        }
+      },
+      "optimizers_config": {
+        "deleted_threshold": 0.2,
+        "vacuum_min_vector_number": 1000,
+        "default_segment_number": 0,
+        "max_segment_size": null,
+        "memmap_threshold": null,
+        "indexing_threshold": 20000,
+        "flush_interval_sec": 5,
+        "max_optimization_threads": 1
+      },
+      "wal_config": {
+        "wal_capacity_mb": 32,
+        "wal_segments_ahead": 0
+      },
+      "payload_indexes": {
+        "component_id": {
+          "type": "keyword"
+        },
+        "component_type": {
+          "type": "keyword"
+        },
+        "name": {
+          "type": "keyword"
+        },
+        "file_path": {
+          "type": "keyword"
+        },
+        "created_at": {
+          "type": "datetime"
+        },
+        "updated_at": {
+          "type": "datetime"
+        },
+        "deleted": {
+          "type": "bool"
+        },
+        "sync_status": {
+          "type": "keyword"
+        }
+      }
+    },
+
+    "function_index": {
+      "description": "Store function embeddings for duplicate detection and semantic search",
+      "vector_config": {
+        "size": 1024,
+        "distance": "Cosine",
+        "index": "hnsw",
+        "hnsw_config": {
+          "m": 16,
+          "ef_construct": 200,
+          "full_scan_threshold": 10000,
+          "max_indexing_threads": 0,
+          "on_disk": false
+        }
+      },
+      "optimizers_config": {
+        "deleted_threshold": 0.2,
+        "vacuum_min_vector_number": 1000,
+        "default_segment_number": 0,
+        "max_segment_size": null,
+        "memmap_threshold": null,
+        "indexing_threshold": 20000,
+        "flush_interval_sec": 5,
+        "max_optimization_threads": 1
+      },
+      "wal_config": {
+        "wal_capacity_mb": 32,
+        "wal_segments_ahead": 0
+      },
+      "payload_indexes": {
+        "function_id": {
+          "type": "keyword"
+        },
+        "name": {
+          "type": "keyword"
+        },
+        "file_path": {
+          "type": "keyword"
+        },
+        "language": {
+          "type": "keyword"
+        },
+        "created_at": {
+          "type": "datetime"
+        },
+        "updated_at": {
+          "type": "datetime"
+        },
+        "deleted": {
+          "type": "bool"
+        },
+        "sync_status": {
+          "type": "keyword"
+        }
+      }
+    },
+
+    "test_history": {
+      "description": "Store test execution records with failure tracking",
+      "vector_config": {
+        "size": 1024,
+        "distance": "Cosine",
+        "index": "hnsw",
+        "hnsw_config": {
+          "m": 16,
+          "ef_construct": 200,
+          "full_scan_threshold": 10000,
+          "max_indexing_threads": 0,
+          "on_disk": false
+        }
+      },
+      "optimizers_config": {
+        "deleted_threshold": 0.2,
+        "vacuum_min_vector_number": 1000,
+        "default_segment_number": 0,
+        "max_segment_size": null,
+        "memmap_threshold": null,
+        "indexing_threshold": 20000,
+        "flush_interval_sec": 5,
+        "max_optimization_threads": 1
+      },
+      "wal_config": {
+        "wal_capacity_mb": 32,
+        "wal_segments_ahead": 0
+      },
+      "payload_indexes": {
+        "test_id": {
+          "type": "keyword"
+        },
+        "test_name": {
+          "type": "keyword"
+        },
+        "test_file": {
+          "type": "keyword"
+        },
+        "status": {
+          "type": "keyword"
+        },
+        "affected_component": {
+          "type": "keyword"
+        },
+        "execution_time": {
+          "type": "datetime"
+        },
+        "created_at": {
+          "type": "datetime"
+        },
+        "updated_at": {
+          "type": "datetime"
+        },
+        "deleted": {
+          "type": "bool"
+        },
+        "sync_status": {
+          "type": "keyword"
+        }
+      }
+    },
+
+    "session_history": {
+      "description": "Store session summaries and key decisions",
+      "vector_config": {
+        "size": 1024,
+        "distance": "Cosine",
+        "index": "hnsw",
+        "hnsw_config": {
+          "m": 16,
+          "ef_construct": 200,
+          "full_scan_threshold": 10000,
+          "max_indexing_threads": 0,
+          "on_disk": false
+        }
+      },
+      "optimizers_config": {
+        "deleted_threshold": 0.2,
+        "vacuum_min_vector_number": 1000,
+        "default_segment_number": 0,
+        "max_segment_size": null,
+        "memmap_threshold": null,
+        "indexing_threshold": 20000,
+        "flush_interval_sec": 5,
+        "max_optimization_threads": 1
+      },
+      "wal_config": {
+        "wal_capacity_mb": 32,
+        "wal_segments_ahead": 0
+      },
+      "payload_indexes": {
+        "session_id": {
+          "type": "keyword"
+        },
+        "start_time": {
+          "type": "datetime"
+        },
+        "end_time": {
+          "type": "datetime"
+        },
+        "created_at": {
+          "type": "datetime"
+        },
+        "updated_at": {
+          "type": "datetime"
+        },
+        "deleted": {
+          "type": "bool"
+        },
+        "sync_status": {
+          "type": "keyword"
+        }
+      }
+    },
+
+    "user_preferences": {
+      "description": "Store coding style preferences and conventions",
+      "vector_config": {
+        "size": 1024,
+        "distance": "Cosine",
+        "index": "hnsw",
+        "hnsw_config": {
+          "m": 16,
+          "ef_construct": 200,
+          "full_scan_threshold": 10000,
+          "max_indexing_threads": 0,
+          "on_disk": false
+        }
+      },
+      "optimizers_config": {
+        "deleted_threshold": 0.2,
+        "vacuum_min_vector_number": 1000,
+        "default_segment_number": 0,
+        "max_segment_size": null,
+        "memmap_threshold": null,
+        "indexing_threshold": 20000,
+        "flush_interval_sec": 5,
+        "max_optimization_threads": 1
+      },
+      "wal_config": {
+        "wal_capacity_mb": 32,
+        "wal_segments_ahead": 0
+      },
+      "payload_indexes": {
+        "preference_id": {
+          "type": "keyword"
+        },
+        "category": {
+          "type": "keyword"
+        },
+        "key": {
+          "type": "keyword"
+        },
+        "scope": {
+          "type": "keyword"
+        },
+        "created_at": {
+          "type": "datetime"
+        },
+        "updated_at": {
+          "type": "datetime"
+        },
+        "deleted": {
+          "type": "bool"
+        },
+        "sync_status": {
+          "type": "keyword"
+        }
+      }
+    }
+  },
+
+  "configuration_notes": {
+    "vector_dimensions": "1024 (Voyage-Code-3 embedding model output)",
+    "distance_metric": "Cosine similarity for semantic similarity comparison",
+    "hnsw_parameters": {
+      "m": "16 (number of edges per node, balances memory and recall)",
+      "ef_construct": "200 (construction time parameter, higher = better recall)",
+      "full_scan_threshold": "10000 (switch to brute force below this threshold)"
+    },
+    "optimizers": {
+      "deleted_threshold": "0.2 (trigger vacuum when 20% of vectors are deleted)",
+      "indexing_threshold": "20000 (start indexing after this many vectors)",
+      "flush_interval_sec": "5 (flush to disk every 5 seconds)"
+    },
+    "wal": {
+      "wal_capacity_mb": "32 (write-ahead log capacity in megabytes)",
+      "wal_segments_ahead": "0 (number of segments to keep ahead)"
+    },
+    "payload_indexes": "Indexes on commonly filtered fields for query performance",
+    "search_parameters": {
+      "ef": "128 (runtime parameter, higher = better recall but slower search)",
+      "exact": "false (use approximate search for speed)"
+    }
+  },
+
+  "performance_tuning": {
+    "high_recall": {
+      "description": "Optimize for recall over speed",
+      "hnsw_config": {
+        "m": 32,
+        "ef_construct": 400
+      },
+      "search_ef": 256
+    },
+    "high_speed": {
+      "description": "Optimize for speed over recall",
+      "hnsw_config": {
+        "m": 8,
+        "ef_construct": 100
+      },
+      "search_ef": 64
+    },
+    "balanced": {
+      "description": "Balance between recall and speed (default)",
+      "hnsw_config": {
+        "m": 16,
+        "ef_construct": 200
+      },
+      "search_ef": 128
+    }
+  },
+
+  "scaling_considerations": {
+    "memory_per_vector": "Approximately 4KB per vector (1024 dims * 4 bytes + payload)",
+    "100k_vectors": "Approximately 400MB RAM required",
+    "1m_vectors": "Approximately 4GB RAM required",
+    "disk_storage": "Enable on_disk=true for vectors when memory constrained",
+    "sharding": "Consider collection sharding when exceeding 10M vectors per collection"
+  }
+}

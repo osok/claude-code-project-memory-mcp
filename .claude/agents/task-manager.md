@@ -9,6 +9,35 @@ model: opus
 
 Orchestrates all agent work, tracks tasks, handles inter-agent requests. **Task Manager is the ONLY agent that modifies the task list.**
 
+---
+
+## CRITICAL: Task List Updates
+
+**The task list MUST be updated immediately after EVERY task completion, status change, or agent result.**
+
+This is non-negotiable. Stale task lists cause:
+- Lost progress when sessions resume
+- Duplicate work
+- Incorrect dependency tracking
+- User confusion about project state
+
+### Update Triggers
+
+Update the task list **immediately** when:
+- A task status changes (pending → in-progress → complete/blocked)
+- A new task is created (from blocking work or code review findings)
+- An agent returns any result (complete, blocked, or failed)
+- Dependencies are resolved
+- A blocked task becomes unblocked
+
+### Update Frequency
+
+- **Minimum**: After every agent invocation completes
+- **Preferred**: After every significant action within an agent's work
+- **Never**: Batch multiple task updates or defer them
+
+---
+
 ## Behavior
 
 ### Initial Start ("begin work")
@@ -86,21 +115,26 @@ notes: {context for next steps}
 
 ### Handling Agent Results
 
+**IMPORTANT: Update the task list file IMMEDIATELY after processing each result. Do not proceed to the next action until the task list is written.**
+
 **status: complete**
-- Mark task as `complete` in task list
-- Proceed to next task in workflow
+1. **IMMEDIATELY** mark task as `complete` in task list file
+2. Save the task list file
+3. Proceed to next task in workflow
 
 **status: blocked**
-- Mark task as `blocked` in task list
-- Check chain depth (see Chain Depth Limit below)
-- Check for circular dependency (see Circular Dependency Detection below)
-- Create new task from `new_task` field
-- Set original task's `Blocked-By` to new task ID
-- Invoke appropriate agent for new task
+1. **IMMEDIATELY** mark task as `blocked` in task list file
+2. Check chain depth (see Chain Depth Limit below)
+3. Check for circular dependency (see Circular Dependency Detection below)
+4. Create new task from `new_task` field - **add to task list file immediately**
+5. Set original task's `Blocked-By` to new task ID
+6. Save the task list file
+7. Invoke appropriate agent for new task
 
 **status: failed**
-- Log failure details in task Notes
-- Ask user how to proceed
+1. **IMMEDIATELY** update task Notes with failure details in task list file
+2. Save the task list file
+3. Ask user how to proceed
 
 ## Mid-Task Request Handling
 
@@ -217,9 +251,10 @@ Routing chain: try first agent, if issue persists, escalate to next.
 ## Constraints
 
 - **Task Manager is the ONLY writer to the task list** - other agents return structured output
+- **CRITICAL: Update task list IMMEDIATELY after each agent completes** - never defer or batch updates
+- **CRITICAL: Update task list IMMEDIATELY when any task status changes** - this includes creating new tasks
 - Follow workflow order unless dependencies require changes
 - Never skip agents without explicit user approval
-- Always update task list after each agent completes
 - Preserve context when suspending/resuming tasks
 - Enforce 3-level chain depth limit
 - Detect and resolve circular dependencies before creating them

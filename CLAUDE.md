@@ -8,17 +8,25 @@ A collection of specialized sub-agents for the complete software development lif
 
 <!-- This section tracks active work. Clear when complete. -->
 
-**Seq:** 001
-**Name:** Framework Enhancements v2
-**Status:** Complete
+**Seq:** 002
+**Name:** Claude Code Long-Term Memory System
+**Status:** In Progress
 
-**Task List:** [TASK-LIST-framework-enhancements.md](TASK-LIST-framework-enhancements.md)
+**Task List:** [TASK-LIST-memory-system.md](project-docs/TASK-LIST-memory-system.md)
 
-**Current Phase:** All Phases Complete
+**Current Phase:** Test Execution & Fixes
 
-**Summary:** Comprehensive enhancements including model configuration, activity logging, git integration, CI/CD, observability, exit criteria, secrets management, dependency policies, environment parity, database migrations, and parallelism documentation.
+**Summary:** Persistent memory infrastructure for Claude Code using Qdrant + Neo4j with MCP integration. Enables context persistence, duplicate detection, design alignment, and consistency enforcement across multi-session development. Unit tests: 202/224 passing (90%), 52% coverage. 22 test fixes needed, then integration/E2E/perf/security tests.
 
-We are NOT using this workflow of agents to build anything. Rather they are the project. This will be used as a template for future development. All tasks in the task-list have been completed.
+**Artifacts:**
+- Requirements: [requirements-memory-docs.md](requirement-docs/requirements-memory-docs.md) (156 requirements)
+- Architecture: [project-docs/adrs/](project-docs/adrs/) (8 ADRs)
+- Design: [design-docs/](design-docs/) (8 design documents)
+- Test Plan: [002-test-plan.md](project-docs/002-test-plan.md) (278 test cases)
+- Testing Strategy: [testing-strategy.md](project-docs/testing-strategy.md)
+- Mock Application: [mock-src/](mock-src/) (Python, TypeScript, Go)
+- Schemas: [project-docs/schemas/](project-docs/schemas/) (4 schema files)
+- Task List: [TASK-LIST-memory-system.md](project-docs/TASK-LIST-memory-system.md) (171 tasks)
 
 ---
 
@@ -166,6 +174,42 @@ project/
 
 ---
 
+## Task List Management
+
+**MANDATORY: Update the task list before marking any work complete.**
+
+### Requirements
+
+1. **Before Ending a Session** - Update task statuses in the task list file to reflect completed work
+2. **Before Marking Complete** - No task or phase can be marked complete until the task list is updated
+3. **Status Values** - Use consistent status values:
+   - `Not Started` - Work has not begun
+   - `**Complete**` - Work is finished (bold)
+   - `Stub` - Placeholder implementation exists
+   - `Partial` - Some work done, more needed
+   - `Blocked` - Cannot proceed due to dependency
+
+### Update Checklist
+
+Before completing a work session:
+
+- [ ] Update individual task statuses in the phase tables
+- [ ] Update the Summary table at the bottom with phase completion status
+- [ ] Add notes to the Notes column indicating where code was implemented
+- [ ] Remove or update any "Needs implementation" notes for completed tasks
+
+### Enforcement
+
+Agents MUST update the task list when:
+- A task is completed
+- A stub implementation is created
+- Work is blocked by a dependency
+- Switching to a different task
+
+Failure to update the task list results in loss of progress visibility across sessions.
+
+---
+
 ## Requirement ID Conventions
 
 | Pattern | Type |
@@ -184,7 +228,7 @@ project/
 
 | Seq | Short Name | Requirements | Design | Task List | Status |
 |-----|------------|--------------|--------|-----------|--------|
-| 001 | Framework Enhancements v2 | N/A | N/A | TASK-LIST-framework-enhancements.md | Complete |
+| 002 | Memory System | requirements-memory-docs.md | design-docs/*.md | TASK-LIST-memory-system.md | Implementation |
 
 ---
 
@@ -195,6 +239,50 @@ project/
 | `initialize` | Reset project, ask what to build |
 | `lets begin` | Check requirements, collect if missing, get approval, start workflow |
 | `continue` | Resume current work from task list |
+
+### `initialize` Workflow
+
+When user says `initialize`, perform these actions **before** asking what to build:
+
+1. **Reset Current Work section** to blank state:
+   ```markdown
+   ## Current Work
+
+   <!-- This section tracks active work. Clear when complete. -->
+
+   **Seq:** (pending)
+   **Name:** (pending)
+   **Status:** Not Started
+
+   **Task List:** (none)
+
+   **Current Phase:** Awaiting Requirements
+
+   **Summary:** (none)
+   ```
+
+2. **Reset README.md** to minimal template:
+   ```markdown
+   # Project Name
+
+   (Project description will be added after requirements are defined)
+
+   ## Getting Started
+
+   See [CLAUDE.md](CLAUDE.md) for development workflow.
+   ```
+
+3. **Reset Document Sequence Tracker** - Clear all rows except header
+
+4. **Clear project artifacts** (if they exist):
+   - Delete files in `requirement-docs/` (except `README.md` and `_sample-requirements.md`)
+   - Delete files in `design-docs/` (except templates)
+   - Delete files in `project-docs/` (except `adrs/` folder structure)
+   - Clear `project-docs/activity.log` if it exists
+
+5. **After all resets complete**, ask: "What would you like to build?"
+
+---
 
 ### `lets begin` Workflow
 
@@ -457,6 +545,75 @@ Refs: REQ-XXX-FN-NNN
 2. Developer resolves conflicts following existing code patterns
 3. Conflicts in design docs escalated to user
 4. Task Manager tracks conflict resolution status
+
+---
+
+## Python Environment Requirements
+
+**MANDATORY: Always use virtual environments for Python projects.**
+
+- NEVER install packages into the system or user's default Python environment
+- Always create and use a `venv` for local Python development
+- Virtual environment location: `./venv/` in the project root
+
+### Setup Commands
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate (Linux/macOS)
+source venv/bin/activate
+
+# Install dependencies
+pip install -e ".[dev]"
+```
+
+---
+
+## Testing Strategy
+
+**MANDATORY: Test against real code, not mocks.**
+
+Full documentation: [project-docs/testing-strategy.md](project-docs/testing-strategy.md)
+
+### Key Principles
+
+1. **Use `mock-src/`** - A comprehensive mock application for testing code parsing, indexing, and relationship detection
+2. **Don't mock infrastructure being tested** - Mock external APIs (embeddings), but not the parsing/indexing being validated
+3. **Known expected results** - Test against defined expected outputs in `conftest_mock_src.py`
+
+### Mock Application Location
+
+```
+mock-src/
+├── python/tasktracker/     # Python: dataclasses, services, repositories
+├── typescript/src/         # TypeScript: interfaces, classes, services
+├── go/pkg/                 # Go: structs, handlers
+├── requirements/           # Mock requirements document
+└── designs/                # Mock architecture document
+```
+
+### Test Fixtures
+
+Use these fixtures instead of creating temporary test files:
+
+| Fixture | Description |
+|---------|-------------|
+| `mock_src_python` | Path to Python mock app |
+| `mock_codebase` | Alias for E2E tests (replaces `temp_codebase`) |
+| `expected_python_functions` | Known function extraction results |
+| `expected_relationships` | Known relationship extraction results |
+
+### Example
+
+```python
+def test_function_extraction(mock_src_python: Path, expected_python_functions: list):
+    """Test against known mock-src results, not mocked data."""
+    results = parse_directory(mock_src_python)
+    for expected in expected_python_functions:
+        assert any(f["name"] == expected["name"] for f in results)
+```
 
 ---
 

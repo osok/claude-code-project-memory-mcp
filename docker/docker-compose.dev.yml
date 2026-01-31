@@ -1,0 +1,32 @@
+version: "3.8"
+
+# Development overrides - use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  memory-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: builder  # Use builder stage for development
+    volumes:
+      - ../src/memory_service:/app/memory_service:ro
+      - ${PROJECT_PATH:-./project}:/project:ro
+      - memory-cache:/app/.cache
+    environment:
+      - LOG_LEVEL=DEBUG
+      - LOG_FORMAT=console
+    command: ["python", "-m", "memory_service"]
+
+  qdrant:
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    environment:
+      - QDRANT__LOG_LEVEL=DEBUG
+
+  neo4j:
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/devpassword

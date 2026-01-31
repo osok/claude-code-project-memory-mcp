@@ -1,0 +1,597 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-memory.local/schemas/memory-schemas.json",
+  "title": "Claude Code Memory System Schemas",
+  "description": "JSON Schema definitions for all 8 memory types in the Claude Code Long-Term Memory System",
+  "version": "1.0",
+
+  "definitions": {
+    "BaseMemory": {
+      "type": "object",
+      "title": "Base Memory Schema",
+      "description": "Common fields shared by all memory types",
+      "required": ["id", "type", "content", "embedding", "created_at", "updated_at", "access_count", "importance_score", "sync_status", "deleted"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Globally unique identifier (UUID v4)"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["requirements", "design", "code_pattern", "component", "function", "test_history", "session", "user_preference"],
+          "description": "Memory type discriminator"
+        },
+        "content": {
+          "type": "string",
+          "description": "Primary content for embedding generation"
+        },
+        "embedding": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1024,
+          "maxItems": 1024,
+          "description": "Voyage-Code-3 embedding vector (1024 dimensions)"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp (ISO8601)"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp (ISO8601)"
+        },
+        "access_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of times memory was retrieved"
+        },
+        "importance_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 0.5,
+          "description": "Priority for retrieval ranking (0.0-1.0)"
+        },
+        "neo4j_node_id": {
+          "type": "string",
+          "description": "Reference to Neo4j node (if applicable)"
+        },
+        "sync_status": {
+          "type": "string",
+          "enum": ["synced", "pending", "failed"],
+          "default": "synced",
+          "description": "Cross-store synchronization status"
+        },
+        "deleted": {
+          "type": "boolean",
+          "default": false,
+          "description": "Soft delete flag"
+        },
+        "deleted_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Soft delete timestamp (ISO8601)"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Type-specific additional data"
+        }
+      }
+    },
+
+    "RequirementsMemory": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseMemory" },
+        {
+          "type": "object",
+          "title": "Requirements Memory Schema",
+          "description": "Memory type for storing parsed requirements documents with traceability",
+          "required": ["requirement_id", "title", "description", "priority", "status", "source_document"],
+          "properties": {
+            "type": {
+              "const": "requirements"
+            },
+            "requirement_id": {
+              "type": "string",
+              "pattern": "^REQ-[A-Z]{3,}-[A-Z]{2,}-[0-9]{3,}$",
+              "description": "Requirement identifier (e.g., REQ-MEM-FN-001)",
+              "examples": ["REQ-MEM-FN-001", "REQ-INT-API-010"]
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Requirement title"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Full requirement text"
+            },
+            "priority": {
+              "type": "string",
+              "enum": ["Critical", "High", "Medium", "Low"],
+              "description": "Requirement priority level"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["Draft", "Approved", "Implemented", "Verified"],
+              "description": "Implementation status"
+            },
+            "source_document": {
+              "type": "string",
+              "description": "Source file path (relative to project root)"
+            },
+            "implementing_components": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "description": "Component IDs that implement this requirement"
+            }
+          }
+        }
+      ]
+    },
+
+    "DesignMemory": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseMemory" },
+        {
+          "type": "object",
+          "title": "Design Memory Schema",
+          "description": "Memory type for storing architectural decisions, ADRs, and design documents",
+          "required": ["design_type", "title", "status"],
+          "properties": {
+            "type": {
+              "const": "design"
+            },
+            "design_type": {
+              "type": "string",
+              "enum": ["ADR", "Specification", "Architecture", "Interface"],
+              "description": "Type of design document"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Design document title"
+            },
+            "decision": {
+              "type": "string",
+              "description": "ADR decision text (required for ADR type)"
+            },
+            "rationale": {
+              "type": "string",
+              "description": "Reasoning for the design decision"
+            },
+            "consequences": {
+              "type": "string",
+              "description": "Trade-offs and implications"
+            },
+            "related_requirements": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^REQ-[A-Z]{3,}-[A-Z]{2,}-[0-9]{3,}$"
+              },
+              "description": "Requirement IDs this design addresses"
+            },
+            "affected_components": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "description": "Component IDs affected by this design"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["Proposed", "Accepted", "Deprecated", "Superseded"],
+              "description": "Design decision status"
+            }
+          }
+        }
+      ]
+    },
+
+    "CodePatternMemory": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseMemory" },
+        {
+          "type": "object",
+          "title": "Code Pattern Memory Schema",
+          "description": "Memory type for storing reusable implementation templates and conventions",
+          "required": ["pattern_name", "pattern_type", "language", "code_template", "usage_context"],
+          "properties": {
+            "type": {
+              "const": "code_pattern"
+            },
+            "pattern_name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable pattern name"
+            },
+            "pattern_type": {
+              "type": "string",
+              "enum": ["Template", "Convention", "Idiom", "Architecture"],
+              "description": "Category of code pattern"
+            },
+            "language": {
+              "type": "string",
+              "description": "Programming language (e.g., Python, TypeScript)"
+            },
+            "code_template": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Template code with placeholders"
+            },
+            "usage_context": {
+              "type": "string",
+              "minLength": 1,
+              "description": "When and how to apply this pattern"
+            },
+            "applicable_components": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Component types this pattern applies to"
+            },
+            "example_implementations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "File paths of example implementations"
+            }
+          }
+        }
+      ]
+    },
+
+    "ComponentRegistryMemory": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseMemory" },
+        {
+          "type": "object",
+          "title": "Component Registry Schema",
+          "description": "Memory type for tracking all system components and their relationships",
+          "required": ["component_id", "component_type", "name", "file_path"],
+          "properties": {
+            "type": {
+              "const": "component"
+            },
+            "component_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Unique component identifier"
+            },
+            "component_type": {
+              "type": "string",
+              "enum": ["Frontend", "Backend", "Agent", "Library", "Service", "Database"],
+              "description": "Category of component"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Component name"
+            },
+            "file_path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Primary file location (relative to project root)"
+            },
+            "public_interface": {
+              "type": "object",
+              "description": "JSON describing exported functions/classes",
+              "properties": {
+                "exports": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "string" },
+                      "type": { "type": "string", "enum": ["function", "class", "constant", "type"] },
+                      "signature": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "dependencies": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Component IDs this component depends on"
+            },
+            "dependents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Component IDs depending on this component"
+            },
+            "base_pattern": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Pattern ID if component extends a base pattern"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+              "description": "Semantic version (e.g., 1.0.0)"
+            }
+          }
+        }
+      ]
+    },
+
+    "FunctionIndexMemory": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseMemory" },
+        {
+          "type": "object",
+          "title": "Function Index Schema",
+          "description": "Memory type for indexing all functions in the codebase for duplicate detection",
+          "required": ["function_id", "name", "signature", "file_path", "start_line", "end_line", "language"],
+          "properties": {
+            "type": {
+              "const": "function"
+            },
+            "function_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Unique function identifier"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Function or method name"
+            },
+            "signature": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Full signature with types"
+            },
+            "file_path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Source file location (relative to project root)"
+            },
+            "start_line": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Starting line number"
+            },
+            "end_line": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Ending line number"
+            },
+            "language": {
+              "type": "string",
+              "description": "Programming language"
+            },
+            "docstring": {
+              "type": "string",
+              "description": "Documentation string"
+            },
+            "containing_class": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Parent class ID (if method)"
+            },
+            "calls": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "description": "Function IDs this function calls"
+            },
+            "called_by": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "description": "Function IDs that call this function"
+            }
+          }
+        }
+      ]
+    },
+
+    "TestHistoryMemory": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseMemory" },
+        {
+          "type": "object",
+          "title": "Test History Schema",
+          "description": "Memory type for tracking test executions, failures, and fixes",
+          "required": ["test_id", "test_name", "test_file", "execution_time", "status"],
+          "properties": {
+            "type": {
+              "const": "test_history"
+            },
+            "test_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Unique test identifier"
+            },
+            "test_name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Test function or method name"
+            },
+            "test_file": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Test file path (relative to project root)"
+            },
+            "execution_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the test was executed (ISO8601)"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["Passed", "Failed", "Skipped", "Error"],
+              "description": "Test execution result"
+            },
+            "failure_message": {
+              "type": "string",
+              "description": "Error message if test failed"
+            },
+            "affected_component": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Component ID under test"
+            },
+            "related_requirements": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^REQ-[A-Z]{3,}-[A-Z]{2,}-[0-9]{3,}$"
+              },
+              "description": "Requirement IDs this test verifies"
+            },
+            "fix_applied": {
+              "type": "string",
+              "description": "Description of fix applied (if test was fixed)"
+            },
+            "fix_commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{7,40}$",
+              "description": "Git commit SHA of fix"
+            },
+            "design_alignment_score": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0,
+              "description": "How well the fix aligns with original design (0.0-1.0)"
+            }
+          }
+        }
+      ]
+    },
+
+    "SessionHistoryMemory": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseMemory" },
+        {
+          "type": "object",
+          "title": "Session History Schema",
+          "description": "Memory type for capturing key decisions and learnings from development sessions",
+          "required": ["session_id", "start_time", "summary"],
+          "properties": {
+            "type": {
+              "const": "session"
+            },
+            "session_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Unique session identifier"
+            },
+            "start_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Session start timestamp (ISO8601)"
+            },
+            "end_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Session end timestamp (ISO8601)"
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Brief session summary"
+            },
+            "key_decisions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Important decisions made during session"
+            },
+            "components_modified": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "description": "Component IDs modified in this session"
+            },
+            "memories_created": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "description": "Memory IDs created during this session"
+            },
+            "outcome": {
+              "type": "string",
+              "description": "Session outcome description"
+            }
+          }
+        }
+      ]
+    },
+
+    "UserPreferencesMemory": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseMemory" },
+        {
+          "type": "object",
+          "title": "User Preferences Schema",
+          "description": "Memory type for storing coding style preferences and conventions",
+          "required": ["preference_id", "category", "key", "value", "scope"],
+          "properties": {
+            "type": {
+              "const": "user_preference"
+            },
+            "preference_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Unique preference identifier"
+            },
+            "category": {
+              "type": "string",
+              "enum": ["CodingStyle", "Naming", "Framework", "Tool", "Convention"],
+              "description": "Preference category"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Preference key (e.g., 'indent_style', 'quote_style')"
+            },
+            "value": {
+              "description": "Preference value (flexible JSON structure)"
+            },
+            "scope": {
+              "type": "string",
+              "enum": ["Global", "Language", "Project", "Component"],
+              "description": "Where this preference applies"
+            },
+            "examples": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Code snippets demonstrating the preference"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
