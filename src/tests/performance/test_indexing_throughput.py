@@ -21,7 +21,7 @@ from memory_service.core.memory_manager import MemoryManager
 from memory_service.storage.qdrant_adapter import QdrantAdapter
 from memory_service.storage.neo4j_adapter import Neo4jAdapter
 
-from .conftest import PerformanceMetrics, MockEmbeddingService
+from .conftest import PerformanceMetrics, DeterministicEmbeddingService
 
 
 class TestIndexingThroughput:
@@ -57,13 +57,13 @@ class TestIndexingThroughput:
         self,
         qdrant_adapter: QdrantAdapter,
         neo4j_adapter: Neo4jAdapter,
-        mock_embedding_service: MockEmbeddingService,
+        embedding_service: DeterministicEmbeddingService,
     ) -> IndexerWorker:
         """Create IndexerWorker for testing."""
         memory_manager = MemoryManager(
             qdrant=qdrant_adapter,
             neo4j=neo4j_adapter,
-            embedding_service=mock_embedding_service,  # type: ignore
+            embedding_service=embedding_service,  # type: ignore
         )
         return IndexerWorker(
             memory_manager=memory_manager,

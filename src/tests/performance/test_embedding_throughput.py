@@ -17,7 +17,7 @@ import pytest
 from memory_service.storage.cache import EmbeddingCache
 from memory_service.embedding.service import EmbeddingService
 
-from .conftest import PerformanceMetrics, MockEmbeddingService
+from .conftest import PerformanceMetrics, DeterministicEmbeddingService
 
 
 class TestEmbeddingThroughput:
@@ -77,7 +77,7 @@ class TestEmbeddingThroughput:
     @pytest.mark.asyncio
     async def test_pt_031_batch_embedding_generation(
         self,
-        mock_embedding_service: MockEmbeddingService,
+        embedding_service: DeterministicEmbeddingService,
     ) -> None:
         """PT-031: Batch embedding generation > 10/sec.
 
@@ -100,7 +100,7 @@ class TestEmbeddingThroughput:
             batch = random.sample(contents, min(batch_size, len(contents)))
 
             op_start = time.perf_counter()
-            results = await mock_embedding_service.embed_batch(batch)
+            results = await embedding_service.embed_batch(batch)
             op_duration_ms = (time.perf_counter() - op_start) * 1000
             metrics.add(op_duration_ms)
             generated_count += len(results)
@@ -119,7 +119,7 @@ class TestEmbeddingThroughput:
     async def test_pt_032_cache_hit_rate(
         self,
         embedding_cache: EmbeddingCache,
-        mock_embedding_service: MockEmbeddingService,
+        embedding_service: DeterministicEmbeddingService,
     ) -> None:
         """PT-032: Cache hit rate > 80% (typical workload).
 
@@ -132,7 +132,7 @@ class TestEmbeddingThroughput:
         # Pre-populate cache with repeated content
         for content in repeated_contents:
             content_hash = hashlib.sha256(content.encode()).hexdigest()
-            embedding, _ = await mock_embedding_service.embed(content)
+            embedding, _ = await embedding_service.embed(content)
             await embedding_cache.put(content_hash, embedding)
 
         # Simulate workload: 80% repeated, 20% unique
@@ -156,7 +156,7 @@ class TestEmbeddingThroughput:
             else:
                 misses += 1
                 # Generate and cache
-                embedding, _ = await mock_embedding_service.embed(content)
+                embedding, _ = await embedding_service.embed(content)
                 await embedding_cache.put(content_hash, embedding)
 
         hit_rate = hits / operations * 100

@@ -37,34 +37,34 @@ class TestGraphTraversalLatency:
     async def populated_graph(
         self,
         neo4j_adapter: Neo4jAdapter,
-    ) -> Neo4jAdapter:
+    ) -> tuple[Neo4jAdapter, list[str]]:
         """Populate Neo4j with test nodes and relationships."""
         # Create nodes in batches
-        batch_size = 100
         node_ids: list[str] = []
 
-        for batch_start in range(0, NODE_COUNT, batch_size):
-            for i in range(batch_start, min(batch_start + batch_size, NODE_COUNT)):
-                node_id = str(uuid4())
-                node_ids.append(node_id)
+        for i in range(NODE_COUNT):
+            node_id = str(uuid4())
+            node_ids.append(node_id)
 
-                await neo4j_adapter.create_node(
-                    memory_id=node_id,
-                    memory_type=MemoryType.FUNCTION,
-                    properties={
-                        "name": f"function_{i}",
-                        "file_path": f"src/module_{i // 100}/file_{i}.py",
-                    },
-                )
+            # Use correct API: create_node(label, properties)
+            await neo4j_adapter.create_node(
+                label="Function",
+                properties={
+                    "id": node_id,
+                    "memory_id": node_id,
+                    "memory_type": "function",
+                    "name": f"function_{i}",
+                    "file_path": f"src/module_{i // 100}/file_{i}.py",
+                },
+            )
 
         # Create relationships (chain-like structure for depth testing)
-        # Each node connects to ~3 others
         for i, node_id in enumerate(node_ids):
             if i > 0:
                 # Connect to previous node
                 await neo4j_adapter.create_relationship(
-                    from_id=node_ids[i - 1],
-                    to_id=node_id,
+                    source_id=node_ids[i - 1],
+                    target_id=node_ids[i],
                     relationship_type=RelationshipType.CALLS,
                     properties={"line": i * 10},
                 )
@@ -73,36 +73,32 @@ class TestGraphTraversalLatency:
             if i > 10 and random.random() < 0.3:
                 target_idx = random.randint(0, i - 1)
                 await neo4j_adapter.create_relationship(
-                    from_id=node_id,
-                    to_id=node_ids[target_idx],
+                    source_id=node_id,
+                    target_id=node_ids[target_idx],
                     relationship_type=RelationshipType.IMPORTS,
                     properties={},
                 )
 
-        return neo4j_adapter
+        return neo4j_adapter, node_ids
 
     @pytest.mark.asyncio
     async def test_pt_010_one_hop_traversal(
         self,
-        populated_graph: Neo4jAdapter,
+        populated_graph: tuple[Neo4jAdapter, list[str]],
         query_engine: QueryEngine,
     ) -> None:
         """PT-010: 1-hop traversal P95 < 100ms.
 
         Target: Single hop relationship traversal under 100ms.
         """
+        neo4j_adapter, node_ids = populated_graph
         metrics = PerformanceMetrics()
 
-        # Get some node IDs for testing
-        async with populated_graph._driver.session() as session:
-            result = await session.run(
-                "MATCH (n:Memory) RETURN n.memory_id as id LIMIT 100"
-            )
-            records = await result.data()
-            node_ids = [r["id"] for r in records]
+        # Use first 100 node IDs for testing
+        test_node_ids = node_ids[:100]
 
         for _ in range(QUERY_COUNT):
-            start_id = random.choice(node_ids)
+            start_id = random.choice(test_node_ids)
 
             start = time.perf_counter()
             results = await query_engine.get_related(
@@ -122,24 +118,19 @@ class TestGraphTraversalLatency:
     @pytest.mark.asyncio
     async def test_pt_011_two_hop_traversal(
         self,
-        populated_graph: Neo4jAdapter,
+        populated_graph: tuple[Neo4jAdapter, list[str]],
         query_engine: QueryEngine,
     ) -> None:
         """PT-011: 2-hop traversal P95 < 150ms.
 
         Target: Two hop relationship traversal under 150ms.
         """
+        neo4j_adapter, node_ids = populated_graph
         metrics = PerformanceMetrics()
-
-        async with populated_graph._driver.session() as session:
-            result = await session.run(
-                "MATCH (n:Memory) RETURN n.memory_id as id LIMIT 100"
-            )
-            records = await result.data()
-            node_ids = [r["id"] for r in records]
+        test_node_ids = node_ids[:100]
 
         for _ in range(QUERY_COUNT):
-            start_id = random.choice(node_ids)
+            start_id = random.choice(test_node_ids)
 
             start = time.perf_counter()
             results = await query_engine.get_related(
@@ -158,24 +149,19 @@ class TestGraphTraversalLatency:
     @pytest.mark.asyncio
     async def test_pt_012_three_hop_traversal(
         self,
-        populated_graph: Neo4jAdapter,
+        populated_graph: tuple[Neo4jAdapter, list[str]],
         query_engine: QueryEngine,
     ) -> None:
         """PT-012: 3-hop traversal P95 < 200ms.
 
         Target: Three hop relationship traversal under 200ms.
         """
+        neo4j_adapter, node_ids = populated_graph
         metrics = PerformanceMetrics()
-
-        async with populated_graph._driver.session() as session:
-            result = await session.run(
-                "MATCH (n:Memory) RETURN n.memory_id as id LIMIT 100"
-            )
-            records = await result.data()
-            node_ids = [r["id"] for r in records]
+        test_node_ids = node_ids[:100]
 
         for _ in range(QUERY_COUNT):
-            start_id = random.choice(node_ids)
+            start_id = random.choice(test_node_ids)
 
             start = time.perf_counter()
             results = await query_engine.get_related(
@@ -194,21 +180,22 @@ class TestGraphTraversalLatency:
     @pytest.mark.asyncio
     async def test_pt_013_complex_cypher_query(
         self,
-        populated_graph: Neo4jAdapter,
+        populated_graph: tuple[Neo4jAdapter, list[str]],
         query_engine: QueryEngine,
     ) -> None:
         """PT-013: Complex Cypher query < 500ms.
 
         Target: Complex query with multiple conditions under 500ms.
         """
+        neo4j_adapter, node_ids = populated_graph
         metrics = PerformanceMetrics()
 
         for _ in range(QUERY_COUNT):
             # Complex query with multiple conditions
             query = """
-            MATCH (n:Memory)-[r:CALLS|IMPORTS]->(m:Memory)
+            MATCH (n:Function)-[r:CALLS|IMPORTS]->(m:Memory)
             WHERE n.memory_type = $type
-            AND exists(n.name)
+            AND n.name IS NOT NULL
             RETURN n.memory_id as source,
                    type(r) as relationship,
                    m.memory_id as target,
@@ -218,8 +205,8 @@ class TestGraphTraversalLatency:
 
             start = time.perf_counter()
             results = await query_engine.graph_query(
-                query=query,
-                params={"type": "function"},
+                cypher=query,
+                parameters={"type": "function"},
             )
             duration_ms = (time.perf_counter() - start) * 1000
             metrics.add(duration_ms)
@@ -246,16 +233,20 @@ class TestGraphQueryPatterns:
             node_id = str(uuid4())
             node_ids.append(node_id)
             await neo4j_adapter.create_node(
-                memory_id=node_id,
-                memory_type=MemoryType.FUNCTION,
-                properties={"name": f"func_{i}"},
+                label="Function",
+                properties={
+                    "id": node_id,
+                    "memory_id": node_id,
+                    "memory_type": "function",
+                    "name": f"func_{i}",
+                },
             )
 
         # Create chain
         for i in range(len(node_ids) - 1):
             await neo4j_adapter.create_relationship(
-                from_id=node_ids[i],
-                to_id=node_ids[i + 1],
+                source_id=node_ids[i],
+                target_id=node_ids[i + 1],
                 relationship_type=RelationshipType.CALLS,
                 properties={},
             )
@@ -277,8 +268,8 @@ class TestGraphQueryPatterns:
 
             start = time.perf_counter()
             results = await query_engine.graph_query(
-                query=query,
-                params={"start_id": node_ids[start_idx], "end_id": node_ids[end_idx]},
+                cypher=query,
+                parameters={"start_id": node_ids[start_idx], "end_id": node_ids[end_idx]},
             )
             duration_ms = (time.perf_counter() - start) * 1000
             metrics.add(duration_ms)
@@ -299,10 +290,14 @@ class TestGraphQueryPatterns:
         # Create nodes with varying properties
         for i in range(200):
             node_id = str(uuid4())
+            label = "Function" if i % 2 == 0 else "Component"
+            memory_type = "function" if i % 2 == 0 else "component"
             await neo4j_adapter.create_node(
-                memory_id=node_id,
-                memory_type=MemoryType.FUNCTION if i % 2 == 0 else MemoryType.COMPONENT,
+                label=label,
                 properties={
+                    "id": node_id,
+                    "memory_id": node_id,
+                    "memory_type": memory_type,
                     "name": f"item_{i}",
                     "module": f"module_{i % 10}",
                 },
@@ -320,7 +315,7 @@ class TestGraphQueryPatterns:
             """
 
             start = time.perf_counter()
-            results = await query_engine.graph_query(query=query, params={})
+            results = await query_engine.graph_query(cypher=query, parameters={})
             duration_ms = (time.perf_counter() - start) * 1000
             metrics.add(duration_ms)
 

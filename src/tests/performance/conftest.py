@@ -1,9 +1,19 @@
-"""Performance test fixtures with testcontainers for Qdrant and Neo4j."""
+"""Performance test fixtures with testcontainers for Qdrant and Neo4j.
+
+Following testing strategy:
+- Use real Qdrant and Neo4j containers (testcontainers)
+- Use deterministic embedding service for reproducibility
+- Use mock-src/ application for realistic test data
+- No mocking of code parsing or storage operations
+"""
 
 import asyncio
+import hashlib
+import math
 import random
 import time
 from collections.abc import AsyncGenerator, Generator
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -20,8 +30,8 @@ except ImportError:
     Neo4jContainer = None  # type: ignore
 
 from memory_service.config import Settings
-from memory_service.storage.qdrant_adapter import QdrantAdapter
-from memory_service.storage.neo4j_adapter import Neo4jAdapter
+from memory_service.storage.qdrant_adapter import QdrantAdapter, COLLECTIONS
+from memory_service.storage.neo4j_adapter import Neo4jAdapter, NODE_LABELS
 from memory_service.core.memory_manager import MemoryManager
 from memory_service.core.query_engine import QueryEngine
 from memory_service.core.workers import IndexerWorker
@@ -127,8 +137,29 @@ def qdrant_container() -> Generator[Any, None, None]:
     if not TESTCONTAINERS_AVAILABLE:
         pytest.skip("testcontainers not available")
 
-    container = QdrantContainer(image="qdrant/qdrant:v1.7.0")
+    # Use latest Qdrant that's compatible with client version 1.16.x
+    container = QdrantContainer(image="qdrant/qdrant:v1.16.0")
     container.start()
+
+    # Wait for Qdrant to be ready with health check
+    import requests
+    host = container.get_container_host_ip()
+    port = container.get_exposed_port(6333)
+    url = f"http://{host}:{port}/healthz"
+
+    max_retries = 30
+    for i in range(max_retries):
+        try:
+            response = requests.get(url, timeout=2)
+            if response.status_code == 200:
+                break
+        except Exception:
+            pass
+        time.sleep(0.5)
+    else:
+        container.stop()
+        pytest.fail("Qdrant container failed to become ready")
+
     yield container
     container.stop()
 
@@ -145,6 +176,26 @@ def neo4j_container() -> Generator[Any, None, None]:
         password="testpassword123",
     )
     container.start()
+
+    # Wait for Neo4j to be ready
+    from neo4j import GraphDatabase
+
+    uri = container.get_connection_url()
+    max_retries = 30
+    for i in range(max_retries):
+        try:
+            driver = GraphDatabase.driver(uri, auth=("neo4j", "testpassword123"))
+            with driver.session() as session:
+                session.run("RETURN 1")
+            driver.close()
+            break
+        except Exception:
+            pass
+        time.sleep(0.5)
+    else:
+        container.stop()
+        pytest.fail("Neo4j container failed to become ready")
+
     yield container
     container.stop()
 
@@ -162,27 +213,37 @@ def perf_settings(
         neo4j_user="neo4j",
         neo4j_password=SecretStr("testpassword123"),
         voyage_api_key=SecretStr("test-api-key"),
-        log_level="WARNING",  # Reduce noise
+        log_level="WARNING",
         log_format="console",
         metrics_enabled=False,
     )
 
 
-class MockEmbeddingService:
-    """Fast mock embedding service for performance tests."""
+class DeterministicEmbeddingService:
+    """Deterministic embedding service for reproducible performance tests.
 
-    def __init__(self) -> None:
+    This is NOT a mock - it provides real, consistent embeddings using
+    a hash-based algorithm. This is allowed per testing strategy as it
+    replaces external API calls (VoyageAI) while maintaining determinism.
+    """
+
+    def __init__(self, dimension: int = 1024) -> None:
+        self._dimension = dimension
         self._cache: dict[str, list[float]] = {}
 
     async def embed(self, content: str) -> tuple[list[float], bool]:
-        """Generate fast deterministic embedding."""
+        """Generate deterministic embedding for content."""
         if content in self._cache:
-            return self._cache[content], False
+            return self._cache[content], True  # Cache hit
 
-        # Fast hash-based embedding
-        embedding = self._fast_embed(content)
+        embedding = self._generate_embedding(content)
         self._cache[content] = embedding
-        return embedding, False
+        return embedding, False  # Cache miss
+
+    async def embed_for_query(self, query: str) -> list[float]:
+        """Generate embedding for search query."""
+        embedding, _ = await self.embed(query)
+        return embedding
 
     async def embed_batch(
         self,
@@ -191,22 +252,27 @@ class MockEmbeddingService:
         """Batch embed multiple contents."""
         return [await self.embed(c) for c in contents]
 
-    def _fast_embed(self, content: str) -> list[float]:
-        """Generate fast 1024-dim embedding."""
-        import hashlib
-        hash_bytes = hashlib.md5(content.encode()).digest()
-        random.seed(int.from_bytes(hash_bytes[:4], 'big'))
-        embedding = [random.random() for _ in range(1024)]
-        # Normalize
-        import math
-        mag = math.sqrt(sum(x * x for x in embedding))
-        return [x / mag for x in embedding]
+    def _generate_embedding(self, content: str) -> list[float]:
+        """Generate deterministic embedding using content hash."""
+        # Use SHA-256 for better distribution
+        hash_bytes = hashlib.sha256(content.encode()).digest()
+
+        # Use hash to seed random generator for reproducibility
+        seed = int.from_bytes(hash_bytes[:8], 'big')
+        rng = random.Random(seed)
+
+        # Generate embedding
+        embedding = [rng.gauss(0, 1) for _ in range(self._dimension)]
+
+        # Normalize to unit vector (like real embeddings)
+        magnitude = math.sqrt(sum(x * x for x in embedding))
+        return [x / magnitude for x in embedding]
 
 
 @pytest.fixture
-def mock_embedding_service() -> MockEmbeddingService:
-    """Create fast mock embedding service."""
-    return MockEmbeddingService()
+def embedding_service() -> DeterministicEmbeddingService:
+    """Create deterministic embedding service for tests."""
+    return DeterministicEmbeddingService()
 
 
 @pytest.fixture(scope="function")
@@ -221,13 +287,22 @@ async def qdrant_adapter(qdrant_container: Any) -> AsyncGenerator[QdrantAdapter,
     await adapter.initialize_collections()
     yield adapter
 
-    # Cleanup
+    # Cleanup - delete all points from collections
+    loop = asyncio.get_running_loop()
     for memory_type in MemoryType:
-        collection = adapter.get_collection_name(memory_type)
-        try:
-            await adapter.delete_collection(collection)
-        except Exception:
-            pass
+        collection = COLLECTIONS.get(memory_type)
+        if collection:
+            try:
+                # Delete all points by scrolling and deleting
+                await loop.run_in_executor(
+                    None,
+                    lambda c=collection: adapter._client.delete(
+                        collection_name=c,
+                        points_selector={"filter": {}},
+                    ),
+                )
+            except Exception:
+                pass
 
 
 @pytest.fixture(scope="function")
@@ -241,7 +316,7 @@ async def neo4j_adapter(neo4j_container: Any) -> AsyncGenerator[Neo4jAdapter, No
     await adapter.initialize_schema()
     yield adapter
 
-    # Cleanup
+    # Cleanup - delete all nodes
     async with adapter._driver.session() as session:
         await session.run("MATCH (n) DETACH DELETE n")
     await adapter.close()
@@ -251,13 +326,13 @@ async def neo4j_adapter(neo4j_container: Any) -> AsyncGenerator[Neo4jAdapter, No
 async def memory_manager(
     qdrant_adapter: QdrantAdapter,
     neo4j_adapter: Neo4jAdapter,
-    mock_embedding_service: MockEmbeddingService,
+    embedding_service: DeterministicEmbeddingService,
 ) -> MemoryManager:
     """Create MemoryManager for performance tests."""
     return MemoryManager(
         qdrant=qdrant_adapter,
         neo4j=neo4j_adapter,
-        embedding_service=mock_embedding_service,  # type: ignore
+        embedding_service=embedding_service,  # type: ignore
     )
 
 
@@ -265,23 +340,43 @@ async def memory_manager(
 async def query_engine(
     qdrant_adapter: QdrantAdapter,
     neo4j_adapter: Neo4jAdapter,
-    mock_embedding_service: MockEmbeddingService,
+    embedding_service: DeterministicEmbeddingService,
 ) -> QueryEngine:
     """Create QueryEngine for performance tests."""
     return QueryEngine(
         qdrant=qdrant_adapter,
         neo4j=neo4j_adapter,
-        embedding_service=mock_embedding_service,  # type: ignore
+        embedding_service=embedding_service,  # type: ignore
     )
+
+
+# Mock-src fixtures for realistic test data
+@pytest.fixture(scope="session")
+def mock_src_root() -> Path:
+    """Path to mock-src directory."""
+    # Navigate from tests/performance/ to project root
+    project_root = Path(__file__).parent.parent.parent.parent
+    mock_src = project_root / "mock-src"
+    if not mock_src.exists():
+        pytest.skip("mock-src directory not found")
+    return mock_src
+
+
+@pytest.fixture(scope="session")
+def mock_src_python(mock_src_root: Path) -> Path:
+    """Path to Python mock application."""
+    python_path = mock_src_root / "python" / "tasktracker"
+    if not python_path.exists():
+        pytest.skip("mock-src/python/tasktracker not found")
+    return python_path
 
 
 def generate_test_embedding(seed: int) -> list[float]:
     """Generate deterministic test embedding."""
-    random.seed(seed)
-    embedding = [random.random() for _ in range(1024)]
-    import math
-    mag = math.sqrt(sum(x * x for x in embedding))
-    return [x / mag for x in embedding]
+    rng = random.Random(seed)
+    embedding = [rng.gauss(0, 1) for _ in range(1024)]
+    magnitude = math.sqrt(sum(x * x for x in embedding))
+    return [x / magnitude for x in embedding]
 
 
 def create_test_function_memory(index: int) -> FunctionMemory:
