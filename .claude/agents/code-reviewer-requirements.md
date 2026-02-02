@@ -9,6 +9,12 @@ model: opus
 
 Reviews all implemented code to verify completeness against the requirements document. Identifies gaps, missing functionality, and incomplete implementations.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `code-reviewer-requirements starting...`
+- On completion: `code-reviewer-requirements ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -110,18 +116,33 @@ Requirements Doc: {path}
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>code-reviewer-requirements</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of requirements review</details>
-  <files>Files reviewed</files>
-  <decisions>Gap identification decisions</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "code-reviewer-requirements",
+  "action": "REVIEW_PASS|REVIEW_FAIL|BLOCKED|ERROR",
+  "phase": "review",
+  "requirements": ["REQ-XXX-FN-001", "REQ-XXX-FN-002"],
+  "task_id": "T001",
+  "details": "Brief description of requirements review",
+  "files_created": ["project-docs/001-requirements-review-feature.md"],
+  "files_modified": [],
+  "decisions": ["Gap identification decisions"],
+  "errors": ["REQ-XXX-FN-003: Missing implementation in src/handler.go"]
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `action`: Use `REVIEW_PASS` when all requirements met, `REVIEW_FAIL` when gaps found
+- `requirements`: Array of REQ-* IDs reviewed
+- `task_id`: The task ID from the task list
+- `files_created`: Review report files (full paths)
+- `files_modified`: Usually empty for reviewers
+- `decisions`: Gap identification and classification decisions
+- `errors`: Array of requirement gaps found with details
 
 ## Return Format
 

@@ -288,6 +288,7 @@ class IndexerWorker:
         qdrant: QdrantAdapter,
         neo4j: Neo4jAdapter,
         job_manager: JobManager,
+        embedding_service: Any | None = None,
     ) -> None:
         """Initialize indexer worker.
 
@@ -295,6 +296,7 @@ class IndexerWorker:
             qdrant: Qdrant adapter for storing memories
             neo4j: Neo4j adapter for storing relationships
             job_manager: Job manager for tracking progress
+            embedding_service: Optional embedding service (created lazily if not provided)
         """
         from memory_service.parsing.parser import ParserOrchestrator
         from memory_service.embedding.service import EmbeddingService
@@ -305,8 +307,8 @@ class IndexerWorker:
         self.job_manager = job_manager
         self.parser = ParserOrchestrator()
 
-        # Will be initialized lazily when needed
-        self._embedding_service: EmbeddingService | None = None
+        # Will be initialized lazily when needed, unless injected
+        self._embedding_service: EmbeddingService | None = embedding_service
         self._memory_manager: MemoryManager | None = None
 
         # Cache of file hashes for incremental indexing
@@ -1345,12 +1347,12 @@ class NormalizerWorker:
         # Check Neo4j for orphaned relationships
         try:
             # Find relationships pointing to non-existent nodes
-            orphaned_rels = await self.neo4j.query(
+            orphaned_rels = await self.neo4j.execute_cypher(
                 """
                 MATCH (n)-[r]->(m)
                 WHERE m.deleted = true
                 RETURN count(r) as orphan_count
-                """,
+                """
             )
 
             if orphaned_rels:
@@ -1359,12 +1361,12 @@ class NormalizerWorker:
 
                 if not dry_run and neo4j_orphans > 0:
                     # Delete orphaned relationships
-                    await self.neo4j.query(
+                    await self.neo4j.execute_cypher(
                         """
                         MATCH (n)-[r]->(m)
                         WHERE m.deleted = true
                         DELETE r
-                        """,
+                        """
                     )
                     orphans_removed += neo4j_orphans
 
@@ -1422,7 +1424,7 @@ class NormalizerWorker:
 
         # Actually refresh embeddings
         embedding_service = EmbeddingService(
-            voyage_api_key=settings.voyage_api_key,
+            api_key=settings.voyage_api_key,
             model=settings.voyage_model,
         )
 

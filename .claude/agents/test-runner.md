@@ -9,6 +9,12 @@ model: sonnet
 
 Executes tests and reports results.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `test-runner starting...`
+- On completion: `test-runner ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -109,18 +115,33 @@ Test Runner MUST report to Task Manager:
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>test-runner</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of test execution results</details>
-  <files>Test files executed</files>
-  <decisions>Test categorization decisions</decisions>
-  <errors>Failed tests and categories (if any)</errors>
+{
+  "agent": "test-runner",
+  "action": "TEST_PASS|TEST_FAIL|BLOCKED|ERROR",
+  "phase": "testing",
+  "requirements": ["REQ-XXX-FN-001"],
+  "task_id": "T001",
+  "details": "Brief description of test execution results",
+  "files_created": [],
+  "files_modified": [],
+  "decisions": ["Test categorization decisions"],
+  "errors": ["Failed test: test_name - category: code_bug"]
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `action`: Use `TEST_PASS` when all tests pass, `TEST_FAIL` when any fail
+- `requirements`: Array of REQ-* IDs verified by these tests
+- `task_id`: The task ID from the task list
+- `files_created`: Usually empty for test runner
+- `files_modified`: Usually empty for test runner
+- `decisions`: Test categorization and triage decisions
+- `errors`: Array of failed test details with categories
 
 ## Return Format
 

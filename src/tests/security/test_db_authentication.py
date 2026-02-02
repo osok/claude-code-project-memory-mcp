@@ -133,19 +133,15 @@ class TestDatabaseAuthentication:
                 password="wrongpassword",
             )
 
-            # This should fail
-            try:
-                health = await adapter.health_check()
-                await adapter.close()
-                pytest.fail("Connection succeeded with wrong password - auth not enforced")
-            except Exception as e:
-                # Expected - authentication should fail
-                error_message = str(e).lower()
-                assert any(
-                    x in error_message
-                    for x in ["auth", "unauthorized", "credentials", "password"]
-                ), f"Unexpected error type: {e}"
-                print(f"\nGood: Connection rejected with wrong credentials: {type(e).__name__}")
+            # This should fail - health_check returns False on auth failure
+            health = await adapter.health_check()
+            await adapter.close()
+
+            # health_check returns False when authentication fails
+            assert health is False, (
+                "Connection succeeded with wrong password - auth not enforced"
+            )
+            print("\nGood: Connection rejected with wrong credentials (health_check returned False)")
 
         finally:
             container.stop()

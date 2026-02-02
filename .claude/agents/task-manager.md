@@ -9,6 +9,12 @@ model: opus
 
 Orchestrates all agent work, tracks tasks, handles inter-agent requests. **Task Manager is the ONLY agent that modifies the task list.**
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `task-manager starting...`
+- On completion: `task-manager ending...`
+
 ---
 
 ## CRITICAL: Task List Updates
@@ -393,36 +399,151 @@ If exit criteria fail but user wants to proceed:
 
 ## Activity Log Management
 
-Task Manager is the **sole writer** to `project-docs/activity.log`.
+Task Manager is the **sole writer** to `project-docs/activity.log`. This is **MANDATORY** - every agent action MUST be logged.
+
+### CRITICAL: Log File Initialization
+
+**On workflow start (before any agent invocation):**
+
+1. Check if `project-docs/activity.log` exists
+2. If NOT exists:
+   - Create the file
+   - Initialize sequence counter to 0
+   - Log Task Manager START entry as seq=1
+3. If exists:
+   - Read last line to get current sequence number
+   - Continue from last sequence + 1
+
+### Log Format
+
+The activity log uses **JSON Lines (JSONL)** format - one JSON object per line. See CLAUDE.md Activity Log section for full schema.
 
 ### Log Entry Processing
 
-After each agent completes, parse and append their `<log-entry>` block:
+**MANDATORY: After EVERY agent action, append a log entry.**
+
+When an agent returns a `<log-entry>` block, Task Manager:
+
+1. **Parse** the JSON from the `<log-entry>` block
+2. **Add metadata**:
+   - `seq`: Increment global sequence counter
+   - `timestamp`: Current UTC time in ISO 8601 format
+   - `parent_seq`: Sequence number of parent invocation (or null)
+   - `duration_ms`: Time elapsed since START (for COMPLETE/ERROR actions)
+3. **Validate** all required fields are present
+4. **Append** the complete JSON object as a single line to `project-docs/activity.log`
+
+### When to Log (MANDATORY)
+
+| Event | Action Type | Log Immediately |
+|-------|-------------|-----------------|
+| Agent invoked | `START` | **Yes - BEFORE agent runs** |
+| Agent completes | `COMPLETE` | **Yes - IMMEDIATELY after** |
+| Agent fails | `ERROR` | **Yes - IMMEDIATELY after** |
+| Agent blocked | `BLOCKED` | **Yes - IMMEDIATELY after** |
+| Blocked agent resumed | `UNBLOCKED` | **Yes - BEFORE resuming** |
+| File created | `FILE_CREATE` | Yes (in agent's log entry) |
+| File modified | `FILE_MODIFY` | Yes (in agent's log entry) |
+| Decision made | `DECISION` | Yes (in agent's log entry) |
+| Code review passes | `REVIEW_PASS` | Yes |
+| Code review fails | `REVIEW_FAIL` | Yes |
+| Tests pass | `TEST_PASS` | Yes |
+| Tests fail | `TEST_FAIL` | Yes |
+
+### Sequence Tracking
+
+Maintain a global sequence counter:
 
 ```
-[YYYY-MM-DD HH:MM:SS] [AGENT-NAME] [ACTION] Details
+seq_counter = 0  # Initialize on workflow start
+
+def next_seq():
+    seq_counter += 1
+    return seq_counter
 ```
 
-### Log Entry Actions
+- **Never reuse** sequence numbers
+- **Never skip** sequence numbers
+- **Persist** by reading last seq from log on resume
 
-| Action | When to Log |
-|--------|-------------|
-| START | Agent invoked |
-| COMPLETE | Agent returns status: complete |
-| ERROR | Agent returns status: failed |
-| DECISION | Agent made architectural/design decision |
-| FILE_MODIFY | Agent modified existing file |
-| FILE_CREATE | Agent created new file |
-| BLOCKED | Agent returns status: blocked |
-| UNBLOCKED | Blocked agent resumed |
+### Parent Tracking
 
-### Log Format Example
+Track invocation hierarchy using a stack:
 
 ```
-[2024-03-15 10:30:00] [developer] [START] Implementing user authentication API
-[2024-03-15 10:45:00] [developer] [FILE_CREATE] src/auth/handler.go
-[2024-03-15 10:50:00] [developer] [COMPLETE] User authentication API implemented
+parent_stack = []  # Stack of (agent_name, seq) tuples
+
+# When invoking agent:
+parent_seq = parent_stack[-1].seq if parent_stack else null
+new_seq = next_seq()
+parent_stack.push((agent_name, new_seq))
+log_entry.parent_seq = parent_seq
+
+# When agent completes:
+parent_stack.pop()
 ```
+
+### Duration Tracking
+
+Track start times for duration calculation:
+
+```
+start_times = {}  # Map of seq -> start_timestamp
+
+# On START:
+start_times[seq] = current_time()
+
+# On COMPLETE or ERROR:
+duration_ms = current_time() - start_times[seq]
+del start_times[seq]
+```
+
+### Log Entry Template
+
+Task Manager constructs the final log entry:
+
+```json
+{
+  "seq": {next_seq()},
+  "timestamp": "{ISO 8601 UTC}",
+  "agent": "{agent_name}",
+  "action": "{ACTION_TYPE}",
+  "phase": "{current_phase}",
+  "parent_seq": {parent_seq or null},
+  "requirements": {from agent log-entry},
+  "task_id": {from agent log-entry},
+  "details": {from agent log-entry},
+  "files_created": {from agent log-entry},
+  "files_modified": {from agent log-entry},
+  "decisions": {from agent log-entry},
+  "errors": {from agent log-entry},
+  "duration_ms": {calculated or null}
+}
+```
+
+### Log File Write Protocol
+
+1. **Serialize** JSON object to single line (no pretty printing)
+2. **Append** to `project-docs/activity.log` with newline
+3. **Verify** write succeeded before proceeding
+4. **Never** modify existing log entries
+
+### Example Log Sequence
+
+```jsonl
+{"seq":1,"timestamp":"2024-03-15T10:30:00Z","agent":"task-manager","action":"START","phase":"implementation","parent_seq":null,"requirements":[],"task_id":null,"details":"Beginning implementation phase","files_created":[],"files_modified":[],"decisions":[],"errors":[],"duration_ms":null}
+{"seq":2,"timestamp":"2024-03-15T10:30:05Z","agent":"developer","action":"START","phase":"implementation","parent_seq":1,"requirements":["REQ-AUTH-FN-001"],"task_id":"T001","details":"Implementing authentication handler","files_created":[],"files_modified":[],"decisions":[],"errors":[],"duration_ms":null}
+{"seq":3,"timestamp":"2024-03-15T10:45:00Z","agent":"developer","action":"COMPLETE","phase":"implementation","parent_seq":1,"requirements":["REQ-AUTH-FN-001"],"task_id":"T001","details":"Authentication handler implemented","files_created":["src/auth/handler.go"],"files_modified":["src/routes.go"],"decisions":["Using JWT tokens"],"errors":[],"duration_ms":895000}
+```
+
+### Failure Recovery
+
+If Task Manager session is interrupted:
+
+1. Read `project-docs/activity.log` to get last sequence number
+2. Check for orphaned START entries (no matching COMPLETE/ERROR)
+3. Log ERROR entries for orphaned starts with `details: "Session interrupted"`
+4. Resume with next sequence number
 
 ## Outputs
 

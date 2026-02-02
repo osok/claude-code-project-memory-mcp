@@ -1,22 +1,51 @@
 ---
 name: frontend-design-agent
-description: Creates design documents for frontend applications (Admin UI, User UI).
+description: Creates or updates design documents for frontend applications (Admin UI, User UI).
 tools: Read, Write, Edit, Glob, Grep
 model: opus
 ---
 
 # Frontend Design Agent
 
-Generates frontend application design documents.
+Creates or updates frontend application design documents.
+
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `frontend-design-agent starting...`
+- On completion: `frontend-design-agent ending...`
+
+## Invocation Context
+
+Design Orchestrator provides:
+```yaml
+mode: create | update
+seq: {sequence number}
+short_name: {work short name}
+component_name: {app name}
+requirements: [REQ-{SEQ}-INT-UI-*, REQ-{SEQ}-FN-*]
+existing_doc: design-docs/30-{app-name}.md  # if mode=update
+```
 
 ## Behavior
 
+### Mode: CREATE (foundational doc doesn't exist)
+
 1. Load template from `design-templates/design-doc-template-frontend.md`
-2. Review assigned requirements
-3. Create design document in `design-docs/30-frontend-{name}.md`
+2. Review requirements for current work
+3. Create `design-docs/30-{app-name}.md`
 4. Fill all template sections with design decisions
 5. Generate component diagrams (mermaid)
-6. Create requirements traceability matrix
+
+### Mode: UPDATE (foundational doc exists)
+
+1. Read existing `design-docs/30-{app-name}.md`
+2. Review requirements for current work
+3. **Preserve all existing content**
+4. Add new section: `## Seq {SEQ}: {Short Name}`
+5. Add new pages, components, routes for new requirements
+6. Update component diagrams if needed
+7. Link to work-specific design: `See [{seq}-design-{short_name}.md]`
 
 ## Key Design Sections
 
@@ -100,18 +129,32 @@ Link to: Style Guide, UI/UX Design, Backend Design, Component Library
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>frontend-design-agent</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of frontend design work</details>
-  <files>Design documents created or modified</files>
-  <decisions>Key frontend design decisions made</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "frontend-design-agent",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "design",
+  "requirements": ["REQ-INT-UI-001", "REQ-XXX-FN-001"],
+  "task_id": null,
+  "details": "Brief description of frontend design work",
+  "files_created": ["design-docs/30-admin-ui.md", "design-docs/30-user-portal.md"],
+  "files_modified": [],
+  "decisions": ["Key frontend design decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-INT-UI-* and related functional requirements
+- `task_id`: Usually null for design phase
+- `files_created`: Frontend design docs with 30- prefix (full paths)
+- `files_modified`: Updated design docs (full paths)
+- `decisions`: Array of frontend design decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 

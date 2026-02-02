@@ -264,7 +264,7 @@ class TestPhaseOrphanDetection:
         Note: The current implementation checks for relationships pointing
         to deleted nodes.
         """
-        mock_neo4j.query.return_value = [{"orphan_count": 5}]
+        mock_neo4j.execute_cypher.return_value = [{"orphan_count": 5}]
 
         result = await normalizer_worker._phase_orphan_detection(dry_run=True)
 

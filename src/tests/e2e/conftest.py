@@ -1,4 +1,31 @@
-"""E2E test fixtures with testcontainers and full stack setup."""
+"""E2E test fixtures with testcontainers and full stack setup.
+
+================================================================================
+                        TESTING STRATEGY - MANDATORY
+================================================================================
+
+**Test against real code, not mocks.**
+
+1. USE mock-src/ - A comprehensive mock application for testing code parsing,
+   indexing, and relationship detection. Located at: mock-src/
+
+2. DON'T mock infrastructure being tested - Mock external APIs (embeddings),
+   but NOT the parsing/indexing being validated.
+
+3. KNOWN expected results - Test against defined expected outputs in
+   conftest_mock_src.py (EXPECTED_PYTHON_FUNCTIONS, EXPECTED_PYTHON_CLASSES,
+   EXPECTED_RELATIONSHIPS).
+
+4. USE fixtures from conftest_mock_src.py:
+   - mock_src_python: Path to Python mock app
+   - mock_codebase: Alias for E2E tests
+   - expected_python_functions: Known function extraction results
+   - expected_python_classes: Known class extraction results
+   - expected_relationships: Known relationship extraction results
+
+See: project-docs/testing-strategy.md and CLAUDE.md for full documentation.
+================================================================================
+"""
 
 import asyncio
 import tempfile
@@ -8,7 +35,23 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+import pytest_asyncio
 from pydantic import SecretStr
+
+# Import mock-src fixtures - these provide the test codebase
+from tests.conftest_mock_src import (
+    mock_src_root,
+    mock_src_python,
+    mock_src_typescript,
+    mock_src_go,
+    mock_codebase,
+    mock_requirements_file,
+    mock_design_file,
+    expected_python_functions,
+    expected_python_classes,
+    expected_relationships,
+    expected_file_counts,
+)
 
 # Testcontainers imports
 try:
@@ -37,10 +80,15 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create event loop for async tests."""
+    """Create event loop for async tests.
+
+    Uses module scope to match the adapter fixture scopes and avoid
+    'Future attached to a different loop' errors.
+    """
     loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
     loop.close()
 
@@ -48,11 +96,32 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 @pytest.fixture(scope="module")
 def qdrant_container() -> Generator[Any, None, None]:
     """Start Qdrant container for E2E tests."""
+    import time
+    import httpx
+
     if not TESTCONTAINERS_AVAILABLE:
         pytest.skip("testcontainers not available")
 
-    container = QdrantContainer(image="qdrant/qdrant:v1.7.0")
+    container = QdrantContainer(image="qdrant/qdrant:v1.15.0")
     container.start()
+
+    # Wait for Qdrant to be ready
+    host = container.get_container_host_ip()
+    port = int(container.get_exposed_port(6333))
+    url = f"http://{host}:{port}/collections"
+
+    max_retries = 30
+    for i in range(max_retries):
+        try:
+            response = httpx.get(url, timeout=2.0)
+            if response.status_code == 200:
+                break
+        except Exception:
+            pass
+        time.sleep(1)
+    else:
+        raise RuntimeError(f"Qdrant container not ready after {max_retries} seconds")
+
     yield container
     container.stop()
 
@@ -60,6 +129,9 @@ def qdrant_container() -> Generator[Any, None, None]:
 @pytest.fixture(scope="module")
 def neo4j_container() -> Generator[Any, None, None]:
     """Start Neo4j container for E2E tests."""
+    import time
+    from neo4j import GraphDatabase
+
     if not TESTCONTAINERS_AVAILABLE:
         pytest.skip("testcontainers not available")
 
@@ -69,6 +141,26 @@ def neo4j_container() -> Generator[Any, None, None]:
         password="testpassword123",
     )
     container.start()
+
+    # Wait for Neo4j to be ready by trying to connect via bolt protocol
+    connection_url = container.get_connection_url()
+
+    max_retries = 60  # Neo4j can take longer to start
+    for i in range(max_retries):
+        try:
+            driver = GraphDatabase.driver(
+                connection_url,
+                auth=("neo4j", "testpassword123"),
+            )
+            with driver.session() as session:
+                session.run("RETURN 1")
+            driver.close()
+            break
+        except Exception:
+            time.sleep(1)
+    else:
+        raise RuntimeError(f"Neo4j container not ready after {max_retries} seconds")
+
     yield container
     container.stop()
 
@@ -82,7 +174,6 @@ class MockEmbeddingServiceE2E:
     async def embed(self, content: str) -> tuple[list[float], bool]:
         """Generate deterministic embedding."""
         import hashlib
-        import struct
 
         if content in self._cache:
             return self._cache[content], False
@@ -91,6 +182,11 @@ class MockEmbeddingServiceE2E:
         embedding = self._generate_from_hash(hash_bytes)
         self._cache[content] = embedding
         return embedding, False
+
+    async def embed_for_query(self, query: str) -> list[float]:
+        """Generate embedding for a search query."""
+        embedding, _ = await self.embed(query)
+        return embedding
 
     async def embed_batch(
         self,
@@ -118,7 +214,7 @@ def mock_embedding_service() -> MockEmbeddingServiceE2E:
     return MockEmbeddingServiceE2E()
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module")
 async def e2e_qdrant_adapter(qdrant_container: Any) -> AsyncGenerator[QdrantAdapter, None]:
     """Create QdrantAdapter for E2E tests."""
     adapter = QdrantAdapter(
@@ -131,7 +227,7 @@ async def e2e_qdrant_adapter(qdrant_container: Any) -> AsyncGenerator[QdrantAdap
     yield adapter
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module")
 async def e2e_neo4j_adapter(neo4j_container: Any) -> AsyncGenerator[Neo4jAdapter, None]:
     """Create Neo4jAdapter for E2E tests."""
     adapter = Neo4jAdapter(
@@ -174,20 +270,24 @@ def e2e_query_engine(
 
 
 @pytest.fixture(scope="module")
+def e2e_job_manager() -> JobManager:
+    """Create JobManager for E2E tests."""
+    return JobManager()
+
+
+@pytest.fixture(scope="module")
 def e2e_indexer_worker(
     e2e_qdrant_adapter: QdrantAdapter,
     e2e_neo4j_adapter: Neo4jAdapter,
     mock_embedding_service: MockEmbeddingServiceE2E,
+    e2e_job_manager: JobManager,
 ) -> IndexerWorker:
     """Create IndexerWorker for E2E tests."""
-    memory_manager = MemoryManager(
+    return IndexerWorker(
         qdrant=e2e_qdrant_adapter,
         neo4j=e2e_neo4j_adapter,
-        embedding_service=mock_embedding_service,  # type: ignore
-    )
-    return IndexerWorker(
-        memory_manager=memory_manager,
-        neo4j=e2e_neo4j_adapter,
+        job_manager=e2e_job_manager,
+        embedding_service=mock_embedding_service,
     )
 
 
@@ -195,13 +295,13 @@ def e2e_indexer_worker(
 def e2e_normalizer_worker(
     e2e_qdrant_adapter: QdrantAdapter,
     e2e_neo4j_adapter: Neo4jAdapter,
-    mock_embedding_service: MockEmbeddingServiceE2E,
+    e2e_job_manager: JobManager,
 ) -> NormalizerWorker:
     """Create NormalizerWorker for E2E tests."""
     return NormalizerWorker(
         qdrant=e2e_qdrant_adapter,
         neo4j=e2e_neo4j_adapter,
-        embedding_service=mock_embedding_service,  # type: ignore
+        job_manager=e2e_job_manager,
     )
 
 

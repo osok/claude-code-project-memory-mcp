@@ -9,6 +9,12 @@ model: sonnet
 
 Implements code following project conventions.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `developer starting...`
+- On completion: `developer ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -156,16 +162,66 @@ Before committing, verify:
 - [ ] No sensitive files (.env, credentials, secrets)
 - [ ] Build still succeeds after changes
 
+## CRITICAL: Environment Isolation
+
+**NEVER install packages globally on the host machine. Always use project-local environments.**
+
+### Pre-Execution Environment Check
+
+Before installing ANY dependency or running package managers:
+
+1. **Verify environment is active**:
+   - Python: Check for active venv (`which python` should show `.venv/bin/python`)
+   - Node.js: Verify in project directory (no `-g` flags)
+   - Other languages: Verify project-local setup per CLAUDE.md
+
+2. **If no environment exists**, request Deployment Agent to set it up first:
+   ```
+   ## Task Result
+   status: blocked
+   blocked_reason: No project environment configured
+   new_task: Set up project environment (venv/node_modules/etc.)
+   ```
+
+### Python Projects
+
+```bash
+# ALWAYS verify venv is active before any pip command
+source .venv/bin/activate  # or verify already active
+
+# CORRECT - install in venv
+pip install package-name
+
+# WRONG - NEVER do these
+pip install package-name  # without venv active
+sudo pip install anything
+pip install --user package-name  # pollutes user site-packages
+```
+
+### Node.js Projects
+
+```bash
+# CORRECT - local install
+npm install package-name
+
+# WRONG - NEVER do these
+npm install -g package-name
+yarn global add package-name
+```
+
+---
+
 ## Dependency Validation
 
 Before installing or adding new dependencies, validate against Security Design policies.
 
 ### Pre-Install Validation
 
-1. **Check design document**: Verify dependency is specified in design
-2. **License validation**: Check against Security Design allowlist
-3. **Vulnerability scan**: Run security scan on package
-4. **Version constraint**: Use version constraint from design
+1. **Verify environment is active** (see Environment Isolation above)
+2. **Check design document**: Verify dependency is specified in design
+3. **License validation**: Check against Security Design allowlist
+4. **Vulnerability scan**: Run security scan on package
+5. **Version constraint**: Use version constraint from design
 
 ### Validation Commands
 
@@ -227,6 +283,9 @@ If implementation requires a dependency not in design:
 - **Stage only files related to current task**
 - **Never install dependencies not specified in design**
 - **Always validate dependencies against Security policies**
+- **CRITICAL: Never install packages globally** - always use project environment
+- **CRITICAL: Verify environment is active** before any package manager commands
+- **CRITICAL: Block and request Deployment Agent** if no project environment exists
 
 ## Outputs
 
@@ -251,18 +310,32 @@ If implementation requires a dependency not in design:
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>developer</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of work performed</details>
-  <files>List of files created or modified</files>
-  <decisions>Key implementation decisions made (if any)</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "developer",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "implementation",
+  "requirements": ["REQ-XXX-FN-001"],
+  "task_id": "T001",
+  "details": "Brief description of work performed",
+  "files_created": ["src/new-file.ts"],
+  "files_modified": ["src/existing-file.ts"],
+  "decisions": ["Key implementation decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-* IDs addressed by this work
+- `task_id`: The task ID from the task list (e.g., "T001")
+- `files_created`: New files created (full paths)
+- `files_modified`: Existing files changed (full paths)
+- `decisions`: Array of key decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 

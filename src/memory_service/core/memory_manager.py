@@ -196,14 +196,19 @@ class MemoryManager:
 
         # Track access
         if track_access:
+            new_access_count = data.get("access_count", 0) + 1
+            new_last_accessed = datetime.now(timezone.utc).isoformat()
             await self.qdrant.update_payload(
                 collection=collection,
                 point_id=memory_id,
                 payload={
-                    "access_count": data.get("access_count", 0) + 1,
-                    "last_accessed_at": datetime.now(timezone.utc).isoformat(),
+                    "access_count": new_access_count,
+                    "last_accessed_at": new_last_accessed,
                 },
             )
+            # Update data to reflect the new access count
+            data["access_count"] = new_access_count
+            data["last_accessed_at"] = new_last_accessed
 
         # Reconstruct memory object
         memory_class = MEMORY_CLASSES[memory_type]

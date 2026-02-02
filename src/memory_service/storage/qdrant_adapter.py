@@ -54,6 +54,7 @@ class QdrantAdapter:
         api_key: Any | None = None,
         grpc_port: int = 6334,
         prefer_grpc: bool = True,
+        timeout: float = 60.0,
     ) -> None:
         """Initialize Qdrant adapter.
 
@@ -63,6 +64,7 @@ class QdrantAdapter:
             api_key: API key for authentication (optional)
             grpc_port: Qdrant gRPC port
             prefer_grpc: Whether to prefer gRPC over HTTP
+            timeout: Request timeout in seconds (default: 60)
         """
         self.host = host
         self.port = port
@@ -77,6 +79,7 @@ class QdrantAdapter:
             grpc_port=grpc_port,
             api_key=api_key_value,
             prefer_grpc=prefer_grpc,
+            timeout=timeout,
         )
         logger.info("qdrant_adapter_initialized", host=host, port=port)
 

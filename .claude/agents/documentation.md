@@ -9,6 +9,12 @@ model: sonnet
 
 Creates and maintains documentation.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `documentation starting...`
+- On completion: `documentation ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -128,18 +134,32 @@ Don't document:
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>documentation</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of documentation work</details>
-  <files>List of doc files created or modified</files>
-  <decisions>Documentation decisions made (if any)</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "documentation",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "documentation",
+  "requirements": ["REQ-XXX-FN-001"],
+  "task_id": "T001",
+  "details": "Brief description of documentation work",
+  "files_created": ["user-docs/guide.md", "developer-docs/api.md"],
+  "files_modified": ["README.md"],
+  "decisions": ["Documentation decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-* IDs documented
+- `task_id`: The task ID from the task list
+- `files_created`: New documentation files (full paths)
+- `files_modified`: Updated documentation files (full paths)
+- `decisions`: Array of documentation decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 

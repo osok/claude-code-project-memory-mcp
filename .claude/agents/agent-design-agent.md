@@ -1,22 +1,51 @@
 ---
 name: agent-design-agent
-description: Creates design documents for background agents, workers, and scheduled tasks.
+description: Creates or updates design documents for background agents, workers, and scheduled tasks.
 tools: Read, Write, Edit, Glob, Grep
 model: opus
 ---
 
 # Agent Design Agent
 
-Generates design documents for background processing agents.
+Creates or updates design documents for background processing agents.
+
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `agent-design-agent starting...`
+- On completion: `agent-design-agent ending...`
+
+## Invocation Context
+
+Design Orchestrator provides:
+```yaml
+mode: create | update
+seq: {sequence number}
+short_name: {work short name}
+component_name: {agent name}
+requirements: [REQ-{SEQ}-FN-*]
+existing_doc: design-docs/40-{agent-name}.md  # if mode=update
+```
 
 ## Behavior
 
+### Mode: CREATE (foundational doc doesn't exist)
+
 1. Load template from `design-templates/design-doc-template-agent.md`
-2. Review assigned requirements and execution model
-3. Create design document in `design-docs/40-agent-{name}.md`
+2. Review requirements for current work
+3. Create `design-docs/40-{agent-name}.md`
 4. Fill all template sections with design decisions
 5. Generate state/flow diagrams (mermaid)
-6. Create requirements traceability matrix
+
+### Mode: UPDATE (foundational doc exists)
+
+1. Read existing `design-docs/40-{agent-name}.md`
+2. Review requirements for current work
+3. **Preserve all existing content**
+4. Add new section: `## Seq {SEQ}: {Short Name}`
+5. Add new tasks, triggers, flows for new requirements
+6. Update state/flow diagrams if needed
+7. Link to work-specific design: `See [{seq}-design-{short_name}.md]`
 
 ## Agent Types
 
@@ -66,18 +95,32 @@ Link to: Backend Design, Data Design, Integration Design, Infrastructure Design
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>agent-design-agent</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of agent design work</details>
-  <files>Design documents created or modified</files>
-  <decisions>Key agent design decisions made</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "agent-design-agent",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "design",
+  "requirements": ["REQ-XXX-FN-001"],
+  "task_id": null,
+  "details": "Brief description of agent design work",
+  "files_created": ["design-docs/40-email-worker.md", "design-docs/40-scheduler.md"],
+  "files_modified": [],
+  "decisions": ["Key agent design decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-* IDs requiring background processing
+- `task_id`: Usually null for design phase
+- `files_created`: Background agent/worker docs with 40- prefix (full paths)
+- `files_modified`: Updated design docs (full paths)
+- `decisions`: Array of agent design decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 

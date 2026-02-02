@@ -9,6 +9,12 @@ model: opus
 
 Plans all tests based on architecture and design documents.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `test-designer starting...`
+- On completion: `test-designer ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -97,18 +103,32 @@ For each requirement, plan tests covering:
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>test-designer</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of test planning work</details>
-  <files>Test plan documents created or modified</files>
-  <decisions>Key test planning decisions made</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "test-designer",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "planning",
+  "requirements": ["REQ-XXX-FN-001", "REQ-XXX-FN-002"],
+  "task_id": null,
+  "details": "Brief description of test planning work",
+  "files_created": ["project-docs/test-plan.md"],
+  "files_modified": [],
+  "decisions": ["Key test planning decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-* IDs covered by test plan
+- `task_id`: Usually null for planning phase
+- `files_created`: Test plan documents (full paths)
+- `files_modified`: Updated test plans (full paths)
+- `decisions`: Array of test planning decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 

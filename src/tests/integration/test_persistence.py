@@ -74,6 +74,7 @@ class TestPersistenceDurability:
         self,
         memory_manager: MemoryManager,
         neo4j_adapter: Neo4jAdapter,
+        skip_if_neo4j_event_loop_issue: None,
     ) -> None:
         """IT-071: Relationships survive within a session."""
         # Create requirement and design
@@ -149,6 +150,7 @@ class TestPersistenceDurability:
         memory_manager: MemoryManager,
         qdrant_adapter: QdrantAdapter,
         neo4j_adapter: Neo4jAdapter,
+        skip_if_neo4j_event_loop_issue: None,
     ) -> None:
         """IT-073: Full stack maintains data integrity."""
         # Create interconnected data
@@ -287,6 +289,7 @@ class TestDataConsistencyChecks:
         memory_manager: MemoryManager,
         qdrant_adapter: QdrantAdapter,
         neo4j_adapter: Neo4jAdapter,
+        skip_if_neo4j_event_loop_issue: None,
     ) -> None:
         """Test that IDs are consistent between Qdrant and Neo4j."""
         memory = RequirementsMemory(

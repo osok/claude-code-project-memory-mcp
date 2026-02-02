@@ -1,4 +1,18 @@
-"""E2E tests for memory persistence flows (E2E-001 to E2E-003)."""
+"""E2E tests for memory persistence flows (E2E-001 to E2E-003).
+
+================================================================================
+                        TESTING STRATEGY - MANDATORY
+================================================================================
+
+**Test against real code, not mocks.**
+
+1. USE mock-src/ for testing code parsing, indexing, and relationship detection.
+2. DON'T mock infrastructure being tested - only mock external APIs (embeddings).
+3. USE fixtures from conftest_mock_src.py for expected results validation.
+
+See: project-docs/testing-strategy.md and CLAUDE.md
+================================================================================
+"""
 
 import pytest
 from uuid import uuid4
@@ -30,7 +44,7 @@ class TestMemoryPersistenceFlows:
             id=uuid4(),
             type=MemoryType.REQUIREMENTS,
             content="System shall support user authentication via OAuth2",
-            requirement_id="REQ-AUTH-E2E-001",
+            requirement_id="REQ-AUTH-TEST-001",
             title="OAuth2 Authentication",
             description="Support OAuth2 authentication flow",
             priority="Critical",
@@ -49,7 +63,7 @@ class TestMemoryPersistenceFlows:
         assert retrieved is not None
         assert retrieved.id == memory_id
         assert retrieved.content == memory.content
-        assert retrieved.requirement_id == "REQ-AUTH-E2E-001"
+        assert retrieved.requirement_id == "REQ-AUTH-TEST-001"
 
         # Session 2: Search for memory
         results = await e2e_query_engine.semantic_search(
@@ -58,7 +72,7 @@ class TestMemoryPersistenceFlows:
             limit=10,
         )
 
-        found_ids = [str(r["id"]) for r in results]
+        found_ids = [str(r.id) for r in results]
         assert str(memory_id) in found_ids
 
     @pytest.mark.asyncio
@@ -94,9 +108,9 @@ class TestMemoryPersistenceFlows:
         )
 
         assert len(search_results) > 0
-        found = [r for r in search_results if str(r["id"]) == str(memory_id)]
+        found = [r for r in search_results if str(r.id) == str(memory_id)]
         assert len(found) == 1
-        assert found[0]["score"] > 0.5  # Should have good similarity
+        assert found[0].score > 0.5  # Should have good similarity
 
         # Step 3: Get memory details (memory_get tool)
         details = await e2e_memory_manager.get_memory(
@@ -125,7 +139,7 @@ class TestMemoryPersistenceFlows:
                 id=uuid4(),
                 type=MemoryType.REQUIREMENTS,
                 content=f"Bulk requirement {i}: System shall {topic}",
-                requirement_id=f"REQ-BULK-{i:03d}",
+                requirement_id=f"REQ-MEM-BULK-{i:03d}",
                 title=f"Bulk Requirement {i}",
                 description=f"Description for {topic}",
                 priority="High" if i < 3 else "Medium",
@@ -193,7 +207,7 @@ class TestMemoryUpdateAndDeleteFlows:
             id=uuid4(),
             type=MemoryType.REQUIREMENTS,
             content="Initial requirement content",
-            requirement_id="REQ-UPDATE-001",
+            requirement_id="REQ-MEM-UPD-001",
             title="Update Test",
             description="Initial description",
             priority="Medium",
@@ -226,7 +240,7 @@ class TestMemoryUpdateAndDeleteFlows:
             limit=5,
         )
 
-        found = [r for r in results if str(r["id"]) == str(memory_id)]
+        found = [r for r in results if str(r.id) == str(memory_id)]
         assert len(found) == 1
 
     @pytest.mark.asyncio
@@ -241,7 +255,7 @@ class TestMemoryUpdateAndDeleteFlows:
             id=uuid4(),
             type=MemoryType.REQUIREMENTS,
             content="Memory to be deleted in E2E test",
-            requirement_id="REQ-DELETE-001",
+            requirement_id="REQ-MEM-DEL-001",
             title="Delete Test",
             description="Will be deleted",
             priority="Low",
@@ -257,7 +271,7 @@ class TestMemoryUpdateAndDeleteFlows:
             memory_types=[MemoryType.REQUIREMENTS],
             limit=10,
         )
-        assert any(str(r["id"]) == str(memory_id) for r in results_before)
+        assert any(str(r.id) == str(memory_id) for r in results_before)
 
         # Delete memory (memory_delete tool)
         deleted = await e2e_memory_manager.delete_memory(
@@ -274,4 +288,4 @@ class TestMemoryUpdateAndDeleteFlows:
             memory_types=[MemoryType.REQUIREMENTS],
             limit=10,
         )
-        assert not any(str(r["id"]) == str(memory_id) for r in results_after)
+        assert not any(str(r.id) == str(memory_id) for r in results_after)

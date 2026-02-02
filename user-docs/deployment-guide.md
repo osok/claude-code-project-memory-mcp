@@ -45,9 +45,9 @@ NEO4J_USER=neo4j
 LOG_LEVEL=INFO
 LOG_FORMAT=json
 
-# HTTP server
-HTTP_HOST=127.0.0.1
-HTTP_PORT=9090
+# Metrics/Health HTTP server
+METRICS_HOST=127.0.0.1   # Use 0.0.0.0 for Docker
+METRICS_PORT=9090
 ```
 
 ### 3. Start Services
@@ -104,8 +104,8 @@ services:
       - VOYAGE_API_KEY=${VOYAGE_API_KEY}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=json
-      - HTTP_HOST=0.0.0.0
-      - HTTP_PORT=9090
+      - METRICS_HOST=0.0.0.0
+      - METRICS_PORT=9090
       - PROJECT_PATH=/project
     depends_on:
       qdrant:
@@ -245,8 +245,8 @@ Claude: I have access to 23 memory tools:
 | `NEO4J_USER` | `neo4j` | Neo4j username |
 | `LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
 | `LOG_FORMAT` | `json` | Log format (json, console) |
-| `HTTP_HOST` | `127.0.0.1` | HTTP server bind address |
-| `HTTP_PORT` | `9090` | HTTP server port |
+| `METRICS_HOST` | `127.0.0.1` | HTTP server bind address (use 0.0.0.0 for Docker) |
+| `METRICS_PORT` | `9090` | HTTP server port |
 | `PROJECT_PATH` | `/project` | Project mount path in container |
 | `CACHE_DIR` | `/app/cache` | Embedding cache directory |
 | `METRICS_ENABLED` | `true` | Enable Prometheus metrics |

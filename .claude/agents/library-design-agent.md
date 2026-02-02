@@ -1,22 +1,51 @@
 ---
 name: library-design-agent
-description: Creates design documents for shared component libraries.
+description: Creates or updates design documents for shared component libraries.
 tools: Read, Write, Edit, Glob, Grep
 model: opus
 ---
 
 # Library Design Agent
 
-Generates design documents for reusable libraries.
+Creates or updates design documents for reusable libraries.
+
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `library-design-agent starting...`
+- On completion: `library-design-agent ending...`
+
+## Invocation Context
+
+Design Orchestrator provides:
+```yaml
+mode: create | update
+seq: {sequence number}
+short_name: {work short name}
+component_name: {library name}
+requirements: [REQ-{SEQ}-FN-*]
+existing_doc: design-docs/10-{library-name}.md  # if mode=update
+```
 
 ## Behavior
 
+### Mode: CREATE (foundational doc doesn't exist)
+
 1. Load template from `design-templates/design-doc-template-library.md`
-2. Review assigned requirements and target consumers
-3. Create design document in `design-docs/10-component-library-{name}.md`
+2. Review requirements for current work
+3. Create `design-docs/10-{library-name}.md`
 4. Fill all template sections with design decisions
 5. Generate API documentation
-6. Create requirements traceability matrix
+
+### Mode: UPDATE (foundational doc exists)
+
+1. Read existing `design-docs/10-{library-name}.md`
+2. Review requirements for current work
+3. **Preserve all existing content**
+4. Add new section: `## Seq {SEQ}: {Short Name}`
+5. Add new components, functions, types for new requirements
+6. Update API documentation as needed
+7. Link to work-specific design: `See [{seq}-design-{short_name}.md]`
 
 ## Library Types
 
@@ -135,18 +164,32 @@ Link to: Style Guide (for UI), Frontend Designs
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>library-design-agent</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of library design work</details>
-  <files>Design documents created or modified</files>
-  <decisions>Key library design decisions made</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "library-design-agent",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "design",
+  "requirements": ["REQ-XXX-FN-001"],
+  "task_id": null,
+  "details": "Brief description of library design work",
+  "files_created": ["design-docs/10-shared-components.md"],
+  "files_modified": [],
+  "decisions": ["Key library design decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-* IDs requiring shared components
+- `task_id`: Usually null for design phase
+- `files_created`: Component library docs with 10- prefix (full paths)
+- `files_modified`: Updated design docs (full paths)
+- `decisions`: Array of library design decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 

@@ -4,6 +4,7 @@ from memory_service.models.base import BaseMemory, MemoryType, SyncStatus
 from memory_service.models.memories import (
     CodePatternMemory,
     ComponentMemory,
+    ComponentType,
     DesignMemory,
     FunctionMemory,
     RequirementsMemory,
@@ -29,6 +30,7 @@ __all__ = [
     "DesignMemory",
     "CodePatternMemory",
     "ComponentMemory",
+    "ComponentType",
     "FunctionMemory",
     "TestHistoryMemory",
     "SessionMemory",

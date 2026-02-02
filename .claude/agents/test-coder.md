@@ -9,6 +9,12 @@ model: sonnet
 
 Writes test code based on test plan.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `test-coder starting...`
+- On completion: `test-coder ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -121,18 +127,32 @@ For each test in the plan:
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>test-coder</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of tests written</details>
-  <files>List of test files created or modified</files>
-  <decisions>Key testing decisions made (if any)</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "test-coder",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "testing",
+  "requirements": ["REQ-XXX-FN-001"],
+  "task_id": "T001",
+  "details": "Brief description of tests written",
+  "files_created": ["tests/unit/test_auth.py"],
+  "files_modified": ["tests/conftest.py"],
+  "decisions": ["Key testing decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-* IDs that tests verify
+- `task_id`: The task ID from the task list
+- `files_created`: New test files (full paths)
+- `files_modified`: Updated test files and fixtures (full paths)
+- `decisions`: Array of testing decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 

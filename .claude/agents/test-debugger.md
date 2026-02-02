@@ -9,6 +9,12 @@ model: opus
 
 Performs deep cross-layer debugging when tests fail. Produces a diagnosis report that tells Task Manager which agent should fix the issue.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `test-debugger starting...`
+- On completion: `test-debugger ending...`
+
 ## Behavior
 
 1. Read Claude.md to understand current work context
@@ -119,18 +125,32 @@ Always output this format for Task Manager:
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>test-debugger</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of debugging results</details>
-  <files>Files investigated</files>
-  <decisions>Root cause classification and routing decision</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "test-debugger",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "testing",
+  "requirements": ["REQ-XXX-FN-001"],
+  "task_id": "T001",
+  "details": "Brief description of debugging results",
+  "files_created": [],
+  "files_modified": [],
+  "decisions": ["Root cause: code_bug in auth handler", "Route to: developer"],
+  "errors": ["TypeError in src/auth/handler.go:42"]
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-* IDs related to the failure
+- `task_id`: The task ID from the task list
+- `files_created`: Usually empty for debugger
+- `files_modified`: Usually empty for debugger
+- `decisions`: Root cause classification and routing decisions
+- `errors`: Array of identified errors with file:line references
 
 ## Return Format
 

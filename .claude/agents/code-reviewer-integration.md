@@ -9,6 +9,12 @@ model: opus
 
 Reviews all implemented code to ensure there are no stubs, TODO placeholders, or incomplete implementations. Verifies that all components are properly wired from frontend to backend to database.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `code-reviewer-integration starting...`
+- On completion: `code-reviewer-integration ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -175,18 +181,33 @@ Seq: {NNN}
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>code-reviewer-integration</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of integration review</details>
-  <files>Files reviewed</files>
-  <decisions>Stub and wiring gap identifications</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "code-reviewer-integration",
+  "action": "REVIEW_PASS|REVIEW_FAIL|BLOCKED|ERROR",
+  "phase": "review",
+  "requirements": ["REQ-INT-API-001"],
+  "task_id": "T001",
+  "details": "Brief description of integration review",
+  "files_created": ["project-docs/001-integration-review-feature.md"],
+  "files_modified": [],
+  "decisions": ["Stub and wiring gap identifications"],
+  "errors": ["STUB: src/api/handler.go:55 - NotImplemented", "WIRING: src/routes.go missing /api/users endpoint"]
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `action`: Use `REVIEW_PASS` when no stubs/gaps, `REVIEW_FAIL` otherwise
+- `requirements`: Array of REQ-INT-* IDs reviewed
+- `task_id`: The task ID from the task list
+- `files_created`: Integration review report files (full paths)
+- `files_modified`: Usually empty for reviewers
+- `decisions`: Stub and wiring gap identifications
+- `errors`: Array of stubs and wiring gaps with file:line references
 
 ## Return Format
 

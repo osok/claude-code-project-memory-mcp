@@ -9,6 +9,12 @@ model: opus
 
 Makes architectural decisions for functional and non-functional requirements, establishes project-wide standards.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `architect starting...`
+- On completion: `architect ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -105,18 +111,32 @@ Ask user about:
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>architect</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of architectural work</details>
-  <files>Architecture docs and ADRs created or modified</files>
-  <decisions>Key architectural decisions made</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "architect",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "architecture",
+  "requirements": ["REQ-XXX-FN-001"],
+  "task_id": null,
+  "details": "Brief description of architectural work",
+  "files_created": ["project-docs/adrs/ADR-001-decision.md"],
+  "files_modified": ["project-docs/architecture.md"],
+  "decisions": ["Key architectural decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-* IDs addressed by architectural decisions
+- `task_id`: Usually null for architecture work, or task ID if task-driven
+- `files_created`: New ADRs and architecture docs (full paths)
+- `files_modified`: Updated architecture docs (full paths)
+- `decisions`: Array of key decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 

@@ -25,16 +25,16 @@ class TestNetworkBinding:
 
         Verify port 9090 is not accessible from external IP.
         """
-        http_server_file = None
+        # Check both http_server.py and __main__.py (where server is started)
+        relevant_files = []
         for f in source_files:
-            if "http_server" in f.name:
-                http_server_file = f
-                break
+            if "http_server" in f.name or f.name == "__main__.py":
+                relevant_files.append(f)
 
-        if not http_server_file:
-            pytest.skip("http_server.py not found")
+        if not relevant_files:
+            pytest.skip("http_server.py or __main__.py not found")
 
-        content = http_server_file.read_text()
+        content = "\n".join(f.read_text() for f in relevant_files)
 
         # Check for bind address configuration
         # Should bind to 127.0.0.1 or localhost, not 0.0.0.0

@@ -9,6 +9,12 @@ model: opus
 
 Parses requirements documents and produces structured analysis for design orchestration.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `requirements-analyzer starting...`
+- On completion: `requirements-analyzer ending...`
+
 ## Behavior
 
 1. Read all documents in `requirement-docs/`
@@ -104,18 +110,32 @@ traceability:
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>requirements-analyzer</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of analysis results</details>
-  <files>Requirements documents analyzed</files>
-  <decisions>Component identification and categorization decisions</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "requirements-analyzer",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "design",
+  "requirements": [],
+  "task_id": null,
+  "details": "Brief description of analysis results",
+  "files_created": [],
+  "files_modified": [],
+  "decisions": ["Component identification and categorization decisions"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Empty array (this agent analyzes requirements, outputs structured data)
+- `task_id`: Usually null for analysis phase
+- `files_created`: Usually empty (outputs YAML structure)
+- `files_modified`: Usually empty
+- `decisions`: Component identification and categorization decisions
+- `errors`: Array of parsing errors or ambiguities found
 
 ## Return Format
 

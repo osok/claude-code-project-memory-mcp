@@ -1,22 +1,50 @@
 ---
 name: security-design-agent
-description: Creates security architecture design documents with threat modeling.
+description: Creates or updates security architecture design documents with threat modeling.
 tools: Read, Write, Edit, Glob, Grep
 model: opus
 ---
 
 # Security Design Agent
 
-Generates security architecture design documents.
+Creates or updates security architecture design documents.
+
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `security-design-agent starting...`
+- On completion: `security-design-agent ending...`
+
+## Invocation Context
+
+Design Orchestrator provides:
+```yaml
+mode: create | update
+seq: {sequence number}
+short_name: {work short name}
+requirements: [REQ-{SEQ}-NFR-SEC-*]
+existing_doc: design-docs/03-security-architecture.md  # if mode=update
+```
 
 ## Behavior
 
+### Mode: CREATE (foundational doc doesn't exist)
+
 1. Load template from `design-templates/design-doc-template-security.md`
-2. Review all component security requirements
-3. Create design document in `design-docs/03-security-architecture.md`
+2. Review security requirements for current work: `REQ-{SEQ}-NFR-SEC-*`
+3. Create `design-docs/03-security-architecture.md`
 4. Perform STRIDE threat modeling
 5. Generate trust boundary diagrams (mermaid)
-6. Create requirements traceability matrix
+
+### Mode: UPDATE (foundational doc exists)
+
+1. Read existing `design-docs/03-security-architecture.md`
+2. Review security requirements for current work: `REQ-{SEQ}-NFR-SEC-*`
+3. **Preserve all existing content**
+4. Add new section: `## Seq {SEQ}: {Short Name} Security`
+5. Add new threat models, controls, and policies for new requirements
+6. Update trust boundary diagrams if needed
+7. Link to work-specific design: `See [{seq}-design-{short_name}.md]`
 
 ## Key Design Sections
 
@@ -197,18 +225,32 @@ Link to: All component designs, Data Design, Infrastructure Design
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>security-design-agent</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of security design work</details>
-  <files>Design documents created or modified</files>
-  <decisions>Key security design decisions made</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "security-design-agent",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "design",
+  "requirements": ["REQ-NFR-SEC-001", "REQ-NFR-SEC-002"],
+  "task_id": null,
+  "details": "Brief description of security design work",
+  "files_created": ["design-docs/03-security-architecture.md"],
+  "files_modified": [],
+  "decisions": ["Key security design decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-NFR-SEC-* IDs addressed
+- `task_id`: Usually null for design phase
+- `files_created`: Security architecture docs with 03- prefix (full paths)
+- `files_modified`: Updated design docs (full paths)
+- `decisions`: Array of security design decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 

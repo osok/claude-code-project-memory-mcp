@@ -67,6 +67,7 @@ class Settings(BaseSettings):
 
     # Metrics Configuration
     metrics_enabled: bool = Field(default=True, description="Enable Prometheus metrics")
+    metrics_host: str = Field(default="127.0.0.1", description="HTTP server bind address (use 0.0.0.0 for Docker)")
     metrics_port: int = Field(default=9090, description="HTTP server port for metrics/health")
 
     # Project Configuration

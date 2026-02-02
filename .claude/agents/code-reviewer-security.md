@@ -9,6 +9,12 @@ model: opus
 
 Reviews all implemented code for security vulnerabilities based on OWASP guidelines and security best practices. Identifies vulnerabilities and recommends fixes.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `code-reviewer-security starting...`
+- On completion: `code-reviewer-security ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -183,18 +189,33 @@ Reviewer: Code-Reviewer-Security
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>code-reviewer-security</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of security review</details>
-  <files>Files reviewed</files>
-  <decisions>Security vulnerability classifications</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "code-reviewer-security",
+  "action": "REVIEW_PASS|REVIEW_FAIL|BLOCKED|ERROR",
+  "phase": "review",
+  "requirements": ["REQ-NFR-SEC-001"],
+  "task_id": "T001",
+  "details": "Brief description of security review",
+  "files_created": ["project-docs/001-security-review-feature.md"],
+  "files_modified": [],
+  "decisions": ["Security vulnerability classifications"],
+  "errors": ["CRITICAL: SQL injection in src/db/query.go:42"]
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `action`: Use `REVIEW_PASS` when no critical/high issues, `REVIEW_FAIL` otherwise
+- `requirements`: Array of REQ-NFR-SEC-* IDs reviewed
+- `task_id`: The task ID from the task list
+- `files_created`: Security review report files (full paths)
+- `files_modified`: Usually empty for reviewers
+- `decisions`: Vulnerability classifications and severity ratings
+- `errors`: Array of security findings with severity and location
 
 ## Return Format
 

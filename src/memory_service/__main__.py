@@ -72,7 +72,7 @@ async def run_services() -> None:
 
     http_config = uvicorn.Config(
         http_app,
-        host="0.0.0.0",
+        host=settings.metrics_host,
         port=settings.metrics_port,
         log_level="warning",
     )

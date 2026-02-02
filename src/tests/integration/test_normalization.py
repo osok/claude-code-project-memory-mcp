@@ -11,7 +11,7 @@ from memory_service.models import (
     SyncStatus,
 )
 from memory_service.core.memory_manager import MemoryManager
-from memory_service.core.workers import NormalizerWorker
+from memory_service.core.workers import NormalizerWorker, JobManager
 from memory_service.storage.qdrant_adapter import QdrantAdapter
 from memory_service.storage.neo4j_adapter import Neo4jAdapter
 
@@ -293,7 +293,7 @@ class TestNormalizationEffectiveness:
         failing_worker = FailingNormalizerWorker(
             qdrant=qdrant_adapter,
             neo4j=neo4j_adapter,
-            embedding_service=mock_embedding_service,  # type: ignore
+            job_manager=JobManager(),
         )
 
         # Run normalization that will fail at validation

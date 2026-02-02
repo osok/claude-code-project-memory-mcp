@@ -9,6 +9,12 @@ model: sonnet
 
 Builds and maintains data layer. Schemas are the source of truth.
 
+## Console Output Protocol
+
+**Required:** Output these messages to console:
+- On start: `data-agent starting...`
+- On completion: `data-agent ending...`
+
 ## Behavior
 
 1. Read Claude.md to get current work context
@@ -251,18 +257,32 @@ For migrations that transform data:
 
 ## Log Entry Output
 
-Include a log entry block in your response for Task Manager to append to activity log:
+**MANDATORY:** Include a log entry block in your response for Task Manager to append to activity log.
 
-```xml
+```json
 <log-entry>
-  <agent>data-agent</agent>
-  <action>COMPLETE|BLOCKED|ERROR</action>
-  <details>Brief description of schema/data work</details>
-  <files>Schema files created or modified</files>
-  <decisions>Data architecture decisions made (if any)</decisions>
-  <errors>Error details (if any)</errors>
+{
+  "agent": "data-agent",
+  "action": "COMPLETE|BLOCKED|ERROR",
+  "phase": "implementation",
+  "requirements": ["REQ-DATA-001"],
+  "task_id": "T001",
+  "details": "Brief description of schema/data work",
+  "files_created": ["project-docs/schemas/schema.sql", "migrations/001_initial.sql"],
+  "files_modified": [],
+  "decisions": ["Data architecture decisions made"],
+  "errors": []
+}
 </log-entry>
 ```
+
+**Field Notes:**
+- `requirements`: Array of REQ-DATA-* IDs addressed
+- `task_id`: The task ID from the task list
+- `files_created`: Schema files, migrations, data dictionaries (full paths)
+- `files_modified`: Updated schema files (full paths)
+- `decisions`: Array of data architecture decisions; empty array if none
+- `errors`: Array of error messages; empty array if none
 
 ## Return Format
 
