@@ -31,9 +31,11 @@ Edit `docker/.env` with your settings:
 ```env
 # Required
 VOYAGE_API_KEY=your-voyage-api-key-here
-
-# Neo4j (change the password!)
 NEO4J_PASSWORD=your-secure-password
+
+# Project Isolation (required)
+PROJECT_ID=my-project             # Unique identifier for this project
+PROJECT_PATH=/path/to/your/project  # Path to project directory
 
 # Optional overrides
 QDRANT_HOST=qdrant
@@ -233,6 +235,8 @@ Claude: I have access to 23 memory tools:
 |----------|-------------|
 | `VOYAGE_API_KEY` | Voyage AI API key for embeddings |
 | `NEO4J_PASSWORD` | Neo4j database password |
+| `PROJECT_ID` | Unique identifier for project data isolation (e.g., `my-project`) |
+| `PROJECT_PATH` | Path to the project directory to mount |
 
 ### Optional
 

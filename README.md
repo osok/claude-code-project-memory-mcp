@@ -1,9 +1,43 @@
-# Claude Code Long-Term Memory System
+# Claude Code Long-Term Memory MCP Server
 
-A persistent memory infrastructure for Claude Code enabling context persistence, duplicate detection, design alignment verification, and consistency enforcement across multi-session software development projects.
+A *development-time* memory service for Claude Code - **not** runtime memory for your application. This MCP server helps Claude maintain context across coding sessions by storing project decisions, code patterns, and requirements. It's tooling that helps Claude build your application better.
+
+Enables context persistence, duplicate detection, design alignment verification, and consistency enforcement across multi-session software development projects.
+
+## Architecture
+
+The MCP server runs **locally** on your machine (not in Docker), while databases run as shared Docker infrastructure:
+
+```
+Developer Machine
++--------------------------------------------------+
+|                                                  |
+|  +-------------------------------------------+   |
+|  |          Project Directory                |   |
+|  |  .claude/mcp.json (project config)        |   |
+|  |  .venv/ (includes claude-memory-mcp)      |   |
+|  +-------------------------------------------+   |
+|                       |                          |
+|                       | stdio                    |
+|                       v                          |
+|  +-------------------------------------------+   |
+|  |       MCP Server (local Python process)   |   |
+|  |       claude-memory-mcp --project-id X    |   |
+|  +-------------------------------------------+   |
+|                       |                          |
+|          +------------+------------+             |
+|          v                         v             |
+|  +---------------+       +------------------+    |
+|  |    Docker     |       |      Docker      |    |
+|  |    Qdrant     |       |      Neo4j       |    |
+|  |  (shared)     |       |    (shared)      |    |
+|  +---------------+       +------------------+    |
++--------------------------------------------------+
+```
 
 ## Features
 
+- **Project Isolation**: Each project has isolated data via `--project-id` namespacing
 - **Semantic Search**: Find relevant context using natural language queries
 - **Duplicate Detection**: Identify similar code patterns before implementation
 - **Design Alignment**: Validate changes against project requirements and ADRs
@@ -15,92 +49,174 @@ A persistent memory infrastructure for Claude Code enabling context persistence,
 
 ### Prerequisites
 
+- Python 3.11+
 - Docker and Docker Compose
 - Voyage AI API key ([Get one here](https://www.voyageai.com/))
 
 ### Installation
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd claude-code-memory-service
-   ```
+**1. Start the database infrastructure (one-time setup):**
 
-2. Configure environment:
-   ```bash
-   cp docker/.env.example docker/.env
-   # Edit docker/.env with your VOYAGE_API_KEY and NEO4J_PASSWORD
-   ```
+```bash
+git clone <repository-url>
+cd claude-code-memory-service/docker
 
-3. Start services:
-   ```bash
-   cd docker
-   docker-compose up -d
-   ```
+# Configure Neo4j password
+cp .env.example .env
+# Edit .env and set NEO4J_PASSWORD
 
-4. Verify installation:
-   ```bash
-   curl http://localhost:9090/health
-   ```
+# Start databases
+docker-compose up -d
+```
+
+**2. Install the MCP server:**
+
+```bash
+pip install claude-memory-mcp
+# or add to your project's requirements.txt / pyproject.toml
+```
+
+**3. Initialize global configuration:**
+
+```bash
+claude-memory-mcp init-config
+# Edit ~/.config/claude-memory/config.toml with:
+#   - Your Voyage AI API key
+#   - Neo4j password (must match .env)
+```
+
+**4. Verify connectivity:**
+
+```bash
+claude-memory-mcp check-db
+```
 
 ### Claude Code Integration
 
-Add to your `~/.claude/mcp.json`:
+**1. Create `.claude/mcp.json` in your project:**
 
 ```json
 {
   "mcpServers": {
     "memory": {
-      "command": "docker",
-      "args": [
-        "exec", "-i", "memory-service",
-        "python", "-m", "memory_service", "mcp"
-      ]
+      "command": "claude-memory-mcp",
+      "args": ["--project-id", "my-project"]
     }
   }
 }
+```
+
+If using a project virtual environment:
+
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "command": ".venv/bin/claude-memory-mcp",
+      "args": ["--project-id", "my-project"]
+    }
+  }
+}
+```
+
+**2. Add to your project's `CLAUDE.md`:**
+
+```markdown
+## Memory Service
+
+Uses persistent memory for context across sessions. See [Quick Reference](user-docs/quick-reference.md).
+
+**Workflow:**
+- Session start: `memory_search` for context
+- Before coding: `code_search`, `find_duplicates`, `get_design_context`
+- After coding: `memory_add` for decisions and session summary
+
+**Key tools:** `memory_search`, `code_search`, `find_duplicates`, `get_design_context`, `memory_add`
 ```
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
+| [Quick Reference](user-docs/quick-reference.md) | Concise tool usage guide |
 | [API Reference](user-docs/api-reference.md) | Complete tool documentation |
 | [Deployment Guide](user-docs/deployment-guide.md) | Docker setup and configuration |
-| [Integration Template](user-docs/integration-template.md) | CLAUDE.md integration examples |
-| [CLAUDE.md](CLAUDE.md) | Development workflow |
+| [Integration Template](user-docs/integration-template.md) | Full CLAUDE.md integration examples |
 
-## Architecture
+## Configuration
 
+### Global Configuration
+
+Located at `~/.config/claude-memory/config.toml`:
+
+```toml
+[qdrant]
+host = "localhost"
+port = 6333
+
+[neo4j]
+uri = "bolt://localhost:7687"
+user = "neo4j"
+password = "your-password"
+
+[voyage]
+api_key = "your-voyage-api-key"
+model = "voyage-code-3"
+
+[server]
+log_level = "INFO"
 ```
-┌─────────────────────────────────────────────────────┐
-│                  Claude Code                         │
-│                 (MCP Client)                         │
-└────────────────────┬────────────────────────────────┘
-                     │ stdio
-┌────────────────────▼────────────────────────────────┐
-│              Memory Service                          │
-│  ┌──────────────────────────────────────────────┐   │
-│  │            MCP Server                         │   │
-│  │  23 Tools: CRUD, Search, Index, Analysis     │   │
-│  └──────────────────────────────────────────────┘   │
-│  ┌────────────────┐  ┌────────────────────────┐     │
-│  │ Query Engine   │  │ Memory Manager         │     │
-│  │ - Semantic     │  │ - CRUD Operations      │     │
-│  │ - Hybrid       │  │ - Conflict Detection   │     │
-│  │ - Graph        │  │ - Importance Scoring   │     │
-│  └────────────────┘  └────────────────────────┘     │
-│  ┌────────────────┐  ┌────────────────────────┐     │
-│  │ Indexer        │  │ Normalizer             │     │
-│  │ - Code Parsing │  │ - Deduplication        │     │
-│  │ - Relationship │  │ - Orphan Cleanup       │     │
-│  └────────────────┘  └────────────────────────┘     │
-└───────────┬─────────────────────────┬───────────────┘
-            │                         │
-    ┌───────▼──────┐         ┌───────▼──────┐
-    │    Qdrant    │         │    Neo4j     │
-    │   (Vectors)  │         │   (Graph)    │
-    └──────────────┘         └──────────────┘
+
+Create with: `claude-memory-mcp init-config`
+
+### Configuration Precedence
+
+1. CLI arguments (highest priority)
+2. Environment variables (`CLAUDE_MEMORY_*` prefix)
+3. Global config file
+4. Built-in defaults
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `CLAUDE_MEMORY_QDRANT_HOST` | Qdrant hostname |
+| `CLAUDE_MEMORY_QDRANT_PORT` | Qdrant port |
+| `CLAUDE_MEMORY_NEO4J_URI` | Neo4j connection URI |
+| `CLAUDE_MEMORY_NEO4J_PASSWORD` | Neo4j password |
+| `CLAUDE_MEMORY_VOYAGE_API_KEY` | Voyage AI API key |
+| `CLAUDE_MEMORY_LOG_LEVEL` | Log level |
+
+## Project Isolation
+
+Each project's data is isolated via `--project-id`. Multiple projects share the same Qdrant/Neo4j databases without data mixing.
+
+**How it works:**
+- Qdrant collections are prefixed: `myproject_functions`, `myproject_designs`, etc.
+- Neo4j nodes include `project_id` property with automatic filtering
+- Project ID is set once at server startup via `--project-id`
+
+**For multiple projects:**
+
+Create separate `mcp.json` files in each project with different `--project-id` values. Each project automatically uses its isolated memory space.
+
+## CLI Commands
+
+```bash
+# Start MCP server (requires --project-id)
+claude-memory-mcp --project-id my-project
+
+# Create global config file
+claude-memory-mcp init-config
+
+# Check database connectivity
+claude-memory-mcp check-db
+
+# Show version
+claude-memory-mcp --version
+
+# Show help
+claude-memory-mcp --help
 ```
 
 ## Memory Types
@@ -116,7 +232,7 @@ Add to your `~/.claude/mcp.json`:
 | `session` | Development session summaries |
 | `user_preference` | User preferences and settings |
 
-## MCP Tools
+## MCP Tools (23 tools)
 
 ### Memory CRUD (5 tools)
 - `memory_add` - Create new memories
@@ -153,17 +269,14 @@ Add to your `~/.claude/mcp.json`:
 
 ## Technology Stack
 
-- **Python 3.12** - Runtime
+- **Python 3.11+** - Runtime
 - **Qdrant** - Vector database for semantic search
 - **Neo4j** - Graph database for relationships
 - **Voyage-Code-3** - Code embedding model
 - **Tree-sitter** - Multi-language code parsing
-- **FastAPI** - HTTP server
 - **MCP Protocol** - Claude Code integration
 
 ## Development
-
-See [CLAUDE.md](CLAUDE.md) for the complete development workflow.
 
 ### Running Tests
 
@@ -174,9 +287,6 @@ pytest src/tests/unit/ -v --cov=memory_service
 # Integration tests (requires Docker)
 pytest src/tests/integration/ -v
 
-# Performance tests
-pytest src/tests/performance/ -v
-
 # Security tests
 pytest src/tests/security/ -v
 ```
@@ -186,7 +296,7 @@ pytest src/tests/security/ -v
 ```
 ├── src/
 │   ├── memory_service/
-│   │   ├── api/          # MCP server, HTTP server, CLI
+│   │   ├── api/          # MCP server, CLI
 │   │   ├── core/         # Memory manager, query engine, workers
 │   │   ├── embedding/    # Voyage client, embedding service
 │   │   ├── models/       # Pydantic models
@@ -194,12 +304,24 @@ pytest src/tests/security/ -v
 │   │   ├── storage/      # Qdrant and Neo4j adapters
 │   │   └── utils/        # Logging, metrics, utilities
 │   └── tests/
-├── docker/               # Docker configuration
+├── docker/               # Database docker-compose
 ├── project-docs/         # Architecture and design docs
 ├── user-docs/            # User documentation
 └── CLAUDE.md             # Development workflow
 ```
 
+## Migrating from Docker-based MCP
+
+If you were using an earlier version where the MCP server ran inside Docker:
+
+1. Stop the old containers: `docker-compose down`
+2. Install the new package: `pip install claude-memory-mcp`
+3. Create global config: `claude-memory-mcp init-config`
+4. Update your `mcp.json` to use the local command instead of `docker exec`
+5. Start databases with new docker-compose: `docker-compose up -d`
+
+Your existing data in Docker volumes will be preserved.
+
 ## License
 
-[License details to be added]
+MIT License

@@ -36,6 +36,8 @@ class Neo4jAdapter:
     - Node CRUD operations
     - Relationship management
     - Graph traversal queries
+
+    All nodes are tagged with project_id for data isolation between projects.
     """
 
     def __init__(
@@ -45,6 +47,7 @@ class Neo4jAdapter:
         password: Any = "",
         database: str = "neo4j",
         max_connection_pool_size: int = 50,
+        project_id: str = "default",
     ) -> None:
         """Initialize Neo4j adapter.
 
@@ -54,9 +57,11 @@ class Neo4jAdapter:
             password: Database password
             database: Database name
             max_connection_pool_size: Connection pool size
+            project_id: Project identifier for data isolation
         """
         self.uri = uri
         self.database = database
+        self.project_id = project_id
 
         # Extract secret value if SecretStr
         password_value = password.get_secret_value() if hasattr(password, "get_secret_value") else password
@@ -66,7 +71,7 @@ class Neo4jAdapter:
             auth=(user, password_value),
             max_connection_pool_size=max_connection_pool_size,
         )
-        logger.info("neo4j_adapter_initialized", uri=uri, database=database)
+        logger.info("neo4j_adapter_initialized", uri=uri, database=database, project_id=project_id)
 
     async def health_check(self) -> bool:
         """Check if Neo4j is healthy and responsive.
@@ -105,6 +110,7 @@ class Neo4jAdapter:
                 ("Memory", "type"),
                 ("Memory", "sync_status"),
                 ("Memory", "deleted"),
+                ("Memory", "project_id"),  # Index for project isolation
                 # Specific type indexes
                 ("Requirement", "requirement_id"),
                 ("Requirement", "status"),
@@ -136,7 +142,7 @@ class Neo4jAdapter:
 
         Args:
             label: Node label
-            properties: Node properties
+            properties: Node properties (project_id added automatically)
 
         Returns:
             Node ID
@@ -145,11 +151,14 @@ class Neo4jAdapter:
 
         start = time.perf_counter()
 
+        # Add project_id to properties for data isolation
+        props_with_project = {**properties, "project_id": self.project_id}
+
         async with self._driver.session(database=self.database) as session:
             try:
                 result = await session.run(
                     f"CREATE (n:{label}:Memory $props) RETURN n.id as id",
-                    props=properties,
+                    props=props_with_project,
                 )
                 record = await result.single()
 
@@ -180,7 +189,7 @@ class Neo4jAdapter:
         node_id: str | UUID,
         label: str | None = None,
     ) -> dict[str, Any] | None:
-        """Retrieve a node by ID.
+        """Retrieve a node by ID (filtered by project_id).
 
         Args:
             node_id: Node ID
@@ -194,8 +203,9 @@ class Neo4jAdapter:
         async with self._driver.session(database=self.database) as session:
             try:
                 result = await session.run(
-                    f"MATCH (n{label_filter}:Memory {{id: $id}}) RETURN properties(n) as props",
+                    f"MATCH (n{label_filter}:Memory {{id: $id, project_id: $project_id}}) RETURN properties(n) as props",
                     id=str(node_id),
+                    project_id=self.project_id,
                 )
                 record = await result.single()
                 return dict(record["props"]) if record else None
@@ -210,7 +220,7 @@ class Neo4jAdapter:
         properties: dict[str, Any],
         label: str | None = None,
     ) -> bool:
-        """Update node properties.
+        """Update node properties (filtered by project_id).
 
         Args:
             node_id: Node ID
@@ -225,8 +235,9 @@ class Neo4jAdapter:
         async with self._driver.session(database=self.database) as session:
             try:
                 result = await session.run(
-                    f"MATCH (n{label_filter}:Memory {{id: $id}}) SET n += $props RETURN n",
+                    f"MATCH (n{label_filter}:Memory {{id: $id, project_id: $project_id}}) SET n += $props RETURN n",
                     id=str(node_id),
+                    project_id=self.project_id,
                     props=properties,
                 )
                 record = await result.single()
@@ -254,7 +265,7 @@ class Neo4jAdapter:
         label: str | None = None,
         detach: bool = True,
     ) -> bool:
-        """Delete a node by ID.
+        """Delete a node by ID (filtered by project_id).
 
         Args:
             node_id: Node ID
@@ -270,8 +281,9 @@ class Neo4jAdapter:
         async with self._driver.session(database=self.database) as session:
             try:
                 result = await session.run(
-                    f"MATCH (n{label_filter}:Memory {{id: $id}}) {delete_cmd} n RETURN count(n) as deleted",
+                    f"MATCH (n{label_filter}:Memory {{id: $id, project_id: $project_id}}) {delete_cmd} n RETURN count(n) as deleted",
                     id=str(node_id),
+                    project_id=self.project_id,
                 )
                 record = await result.single()
 
@@ -317,13 +329,14 @@ class Neo4jAdapter:
             try:
                 result = await session.run(
                     f"""
-                    MATCH (a:Memory {{id: $source_id}})
-                    MATCH (b:Memory {{id: $target_id}})
+                    MATCH (a:Memory {{id: $source_id, project_id: $project_id}})
+                    MATCH (b:Memory {{id: $target_id, project_id: $project_id}})
                     CREATE (a)-[r:{rel_type} $props]->(b)
                     RETURN r
                     """,
                     source_id=str(source_id),
                     target_id=str(target_id),
+                    project_id=self.project_id,
                     props=props,
                 )
                 record = await result.single()
@@ -367,12 +380,13 @@ class Neo4jAdapter:
             try:
                 result = await session.run(
                     f"""
-                    MATCH (a:Memory {{id: $source_id}})-[r{rel_filter}]->(b:Memory {{id: $target_id}})
+                    MATCH (a:Memory {{id: $source_id, project_id: $project_id}})-[r{rel_filter}]->(b:Memory {{id: $target_id, project_id: $project_id}})
                     DELETE r
                     RETURN count(r) as deleted
                     """,
                     source_id=str(source_id),
                     target_id=str(target_id),
+                    project_id=self.project_id,
                 )
                 record = await result.single()
                 return record["deleted"] if record else 0
@@ -426,7 +440,7 @@ class Neo4jAdapter:
             try:
                 result = await session.run(
                     f"""
-                    MATCH (start:Memory {{id: $id}}){pattern}(related:Memory)
+                    MATCH (start:Memory {{id: $id, project_id: $project_id}}){pattern}(related:Memory {{project_id: $project_id}})
                     WHERE related.id <> $id
                     RETURN DISTINCT
                         related.id as id,
@@ -436,6 +450,7 @@ class Neo4jAdapter:
                     LIMIT $limit
                     """,
                     id=str(node_id),
+                    project_id=self.project_id,
                     limit=limit,
                 )
 
@@ -547,12 +562,13 @@ class Neo4jAdapter:
                 result = await session.run(
                     f"""
                     MATCH path = shortestPath(
-                        (start:Memory {{id: $start_id}})-[{rel_types}*1..{max_depth}]-(end:Memory {{id: $end_id}})
+                        (start:Memory {{id: $start_id, project_id: $project_id}})-[{rel_types}*1..{max_depth}]-(end:Memory {{id: $end_id, project_id: $project_id}})
                     )
                     RETURN [node in nodes(path) | {{id: node.id, labels: labels(node), properties: properties(node)}}] as path
                     """,
                     start_id=str(start_id),
                     end_id=str(end_id),
+                    project_id=self.project_id,
                 )
                 record = await result.single()
                 return record["path"] if record else None
@@ -566,7 +582,7 @@ class Neo4jAdapter:
         label: str | None = None,
         filters: dict[str, Any] | None = None,
     ) -> int:
-        """Count nodes matching criteria.
+        """Count nodes matching criteria (filtered by project_id).
 
         Args:
             label: Optional label filter
@@ -576,16 +592,18 @@ class Neo4jAdapter:
             Node count
         """
         label_filter = f":{label}" if label else ""
-        where_clause = ""
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = {"project_id": self.project_id}
+
+        # Always filter by project_id
+        conditions = ["n.project_id = $project_id"]
 
         if filters:
-            conditions = []
             for i, (key, value) in enumerate(filters.items()):
                 param_name = f"p{i}"
                 conditions.append(f"n.{key} = ${param_name}")
                 params[param_name] = value
-            where_clause = "WHERE " + " AND ".join(conditions)
+
+        where_clause = "WHERE " + " AND ".join(conditions)
 
         async with self._driver.session(database=self.database) as session:
             try:

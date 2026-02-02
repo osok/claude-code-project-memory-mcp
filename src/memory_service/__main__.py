@@ -9,6 +9,51 @@ from memory_service.config import get_settings
 from memory_service.utils.logging import get_logger, setup_logging
 
 
+async def run_mcp_only() -> None:
+    """Run only the MCP server (for stdio integration with Claude Code)."""
+    from memory_service.api.mcp_server import MCPServer
+    from memory_service.storage.qdrant_adapter import QdrantAdapter
+    from memory_service.storage.neo4j_adapter import Neo4jAdapter
+    from memory_service.embedding.service import EmbeddingService
+
+    settings = get_settings()
+
+    # Initialize storage adapters with project_id for data isolation
+    qdrant = QdrantAdapter(
+        host=settings.qdrant_host,
+        port=settings.qdrant_port,
+        api_key=settings.qdrant_api_key,
+        project_id=settings.project_id,
+    )
+    neo4j = Neo4jAdapter(
+        uri=settings.neo4j_uri,
+        user=settings.neo4j_user,
+        password=settings.neo4j_password,
+        project_id=settings.project_id,
+    )
+    embedding_service = EmbeddingService(
+        api_key=settings.voyage_api_key,
+        model=settings.voyage_model,
+    )
+
+    # Initialize collections/schema
+    await qdrant.initialize_collections()
+    await neo4j.initialize_schema()
+
+    # Create and run MCP server only
+    mcp_server = MCPServer(
+        qdrant=qdrant,
+        neo4j=neo4j,
+        embedding_service=embedding_service,
+    )
+
+    try:
+        await mcp_server.run()
+    finally:
+        await qdrant.close()
+        await neo4j.close()
+
+
 async def run_services() -> None:
     """Run all services (MCP server, HTTP server, background workers)."""
     from memory_service.api.http_server import create_http_server
@@ -21,18 +66,20 @@ async def run_services() -> None:
     settings = get_settings()
     logger = get_logger(__name__)
 
-    logger.info("starting_memory_service", version="0.1.0")
+    logger.info("starting_memory_service", version="0.1.0", project_id=settings.project_id)
 
-    # Initialize storage adapters
+    # Initialize storage adapters with project_id for data isolation
     qdrant = QdrantAdapter(
         host=settings.qdrant_host,
         port=settings.qdrant_port,
         api_key=settings.qdrant_api_key,
+        project_id=settings.project_id,
     )
     neo4j = Neo4jAdapter(
         uri=settings.neo4j_uri,
         user=settings.neo4j_user,
         password=settings.neo4j_password,
+        project_id=settings.project_id,
     )
     embedding_service = EmbeddingService(
         api_key=settings.voyage_api_key,
@@ -96,6 +143,17 @@ async def run_services() -> None:
 
 def main() -> NoReturn:
     """Main entry point."""
+    # Check for "mcp" argument to run MCP-only mode
+    if len(sys.argv) > 1 and sys.argv[1] == "mcp":
+        # Use stderr for logging in MCP mode to keep stdout clean for JSON-RPC
+        setup_logging(use_stderr=True)
+        try:
+            asyncio.run(run_mcp_only())
+        except KeyboardInterrupt:
+            pass
+        sys.exit(0)
+
+    # Default: run all services with stdout logging
     setup_logging()
     try:
         asyncio.run(run_services())

@@ -41,6 +41,7 @@ def health() -> None:
                 host=settings.qdrant_host,
                 port=settings.qdrant_port,
                 api_key=settings.qdrant_api_key,
+                project_id=settings.project_id,
             )
             result["qdrant"]["status"] = "healthy" if await qdrant.health_check() else "unhealthy"
             await qdrant.close()
@@ -53,6 +54,7 @@ def health() -> None:
                 uri=settings.neo4j_uri,
                 user=settings.neo4j_user,
                 password=settings.neo4j_password,
+                project_id=settings.project_id,
             )
             result["neo4j"]["status"] = "healthy" if await neo4j.health_check() else "unhealthy"
             await neo4j.close()
@@ -85,9 +87,14 @@ def stats() -> None:
             host=settings.qdrant_host,
             port=settings.qdrant_port,
             api_key=settings.qdrant_api_key,
+            project_id=settings.project_id,
         )
 
-        stats: dict[str, Any] = {"memory_counts": {}, "total": 0}
+        stats: dict[str, Any] = {
+            "project_id": settings.project_id,
+            "memory_counts": {},
+            "total": 0,
+        }
 
         for memory_type in MemoryType:
             collection = qdrant.get_collection_name(memory_type)
@@ -109,18 +116,28 @@ def stats() -> None:
 @cli.command()
 @click.argument("directory", type=click.Path(exists=True))
 @click.option("--extensions", "-e", multiple=True, help="File extensions to include")
+@click.option("--exclude", "-x", multiple=True, help="Patterns to exclude")
+@click.option("--force", "-f", is_flag=True, help="Force re-index even if files unchanged")
 @click.option("--dry-run", is_flag=True, help="Show what would be indexed without indexing")
-def index(directory: str, extensions: tuple[str, ...], dry_run: bool) -> None:
-    """Index a directory of source code."""
+def index(directory: str, extensions: tuple[str, ...], exclude: tuple[str, ...], force: bool, dry_run: bool) -> None:
+    """Index a directory of source code.
+
+    Parses source files, extracts functions and classes, and stores them
+    in Qdrant and Neo4j for semantic search and relationship tracking.
+    """
 
     async def _index() -> dict[str, Any]:
         from pathlib import Path
 
-        from memory_service.parsing.parser import ParserOrchestrator
+        from memory_service.storage.qdrant_adapter import QdrantAdapter
+        from memory_service.storage.neo4j_adapter import Neo4jAdapter
+        from memory_service.embedding.service import EmbeddingService
+        from memory_service.core.workers import IndexerWorker, JobManager
         from memory_service.utils.gitignore import GitignoreFilter
 
-        parser = ParserOrchestrator()
+        settings = get_settings()
         ext_list = list(extensions) if extensions else None
+        exclude_list = list(exclude) if exclude else None
 
         if dry_run:
             gitignore = GitignoreFilter(Path(directory))
@@ -133,23 +150,53 @@ def index(directory: str, extensions: tuple[str, ...], dry_run: bool) -> None:
                 "truncated": len(files) > 50,
             }
 
-        results = await parser.parse_directory(
-            directory,
-            extensions=ext_list,
+        # Initialize storage adapters with project_id
+        qdrant = QdrantAdapter(
+            host=settings.qdrant_host,
+            port=settings.qdrant_port,
+            api_key=settings.qdrant_api_key,
+            project_id=settings.project_id,
+        )
+        neo4j = Neo4jAdapter(
+            uri=settings.neo4j_uri,
+            user=settings.neo4j_user,
+            password=settings.neo4j_password,
+            project_id=settings.project_id,
+        )
+        embedding_service = EmbeddingService(
+            api_key=settings.voyage_api_key,
+            model=settings.voyage_model,
         )
 
-        return {
-            "mode": "indexed",
-            "directory": directory,
-            "file_count": len(results),
-            "function_count": sum(r.function_count for r in results),
-            "class_count": sum(r.class_count for r in results),
-            "error_count": sum(1 for r in results if r.errors),
-        }
+        # Initialize collections/schema
+        await qdrant.initialize_collections()
+        await neo4j.initialize_schema()
+
+        # Create indexer worker (the proper way to index with storage)
+        job_manager = JobManager()
+        indexer = IndexerWorker(
+            qdrant=qdrant,
+            neo4j=neo4j,
+            job_manager=job_manager,
+            embedding_service=embedding_service,
+        )
+
+        # Run the actual indexing (parse + store)
+        result = await indexer.index_directory(
+            directory=directory,
+            extensions=ext_list,
+            exclude_patterns=exclude_list,
+            force=force,
+        )
+
+        await qdrant.close()
+        await neo4j.close()
+
+        return result
 
     setup_logging()
     result = asyncio.run(_index())
-    click.echo(json.dumps(result, indent=2))
+    click.echo(json.dumps(result, indent=2, default=str))
 
 
 @cli.command()
@@ -173,11 +220,13 @@ def normalize(phases: tuple[str, ...], dry_run: bool) -> None:
             host=settings.qdrant_host,
             port=settings.qdrant_port,
             api_key=settings.qdrant_api_key,
+            project_id=settings.project_id,
         )
         neo4j = Neo4jAdapter(
             uri=settings.neo4j_uri,
             user=settings.neo4j_user,
             password=settings.neo4j_password,
+            project_id=settings.project_id,
         )
         job_manager = JobManager()
 
@@ -365,6 +414,7 @@ def init_schema() -> None:
                 host=settings.qdrant_host,
                 port=settings.qdrant_port,
                 api_key=settings.qdrant_api_key,
+                project_id=settings.project_id,
             )
             await qdrant.initialize_collections()
             result["qdrant"] = "initialized"
@@ -377,6 +427,7 @@ def init_schema() -> None:
                 uri=settings.neo4j_uri,
                 user=settings.neo4j_user,
                 password=settings.neo4j_password,
+                project_id=settings.project_id,
             )
             await neo4j.initialize_schema()
             result["neo4j"] = "initialized"

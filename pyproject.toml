@@ -1,15 +1,16 @@
 [project]
-name = "memory-service"
-version = "0.1.0"
-description = "Claude Code Long-Term Memory System - Persistent memory infrastructure for complex, multi-session software development projects"
+name = "claude-memory-mcp"
+version = "0.2.0"
+description = "Claude Code Long-Term Memory MCP Server - Persistent memory infrastructure for complex, multi-session software development projects"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
     { name = "Claude Code", email = "noreply@anthropic.com" }
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -20,16 +21,15 @@ dependencies = [
     "voyageai>=0.2.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "fastapi>=0.100.0",
-    "uvicorn>=0.23.0",
     "tree-sitter>=0.21.0,<0.22.0",
     "tree-sitter-languages>=1.8.0",
     "httpx>=0.24.0",
     "structlog>=23.0.0",
-    "prometheus-client>=0.17.0",
     "click>=8.0.0",
     "pathspec>=0.11.0",
     "aiosqlite>=0.19.0",
+    "tomli>=2.0.0",
+    "tomli-w>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -45,8 +45,7 @@ dev = [
 ]
 
 [project.scripts]
-memory-service = "memory_service.__main__:main"
-memory-cli = "memory_service.api.cli:main"
+claude-memory-mcp = "memory_service.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -54,6 +53,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/memory_service"]
+
+# Legacy entry points for backward compatibility
+[project.entry-points."memory_service"]
+legacy-service = "memory_service.__main__:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

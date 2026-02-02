@@ -73,8 +73,13 @@ def sanitize_for_logging(
     return {k: redact_value(k, v) for k, v in event_dict.items()}
 
 
-def setup_logging() -> None:
-    """Configure structured logging based on settings."""
+def setup_logging(use_stderr: bool = False) -> None:
+    """Configure structured logging based on settings.
+
+    Args:
+        use_stderr: If True, output logs to stderr instead of stdout.
+                   Use this for MCP mode where stdout is reserved for JSON-RPC.
+    """
     settings = get_settings()
 
     # Shared processors for all outputs
@@ -108,7 +113,9 @@ def setup_logging() -> None:
     )
 
     # Configure standard library logging
-    handler = logging.StreamHandler(sys.stdout)
+    # Use stderr for MCP mode to keep stdout clean for JSON-RPC
+    output_stream = sys.stderr if use_stderr else sys.stdout
+    handler = logging.StreamHandler(output_stream)
     handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             processor=renderer,

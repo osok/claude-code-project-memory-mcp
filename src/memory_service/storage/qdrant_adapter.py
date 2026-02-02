@@ -45,6 +45,8 @@ class QdrantAdapter:
     - Collection initialization
     - CRUD operations (upsert, get, update, delete)
     - Vector similarity search with filtering
+
+    Collections are namespaced by project_id for data isolation between projects.
     """
 
     def __init__(
@@ -55,6 +57,7 @@ class QdrantAdapter:
         grpc_port: int = 6334,
         prefer_grpc: bool = True,
         timeout: float = 60.0,
+        project_id: str = "default",
     ) -> None:
         """Initialize Qdrant adapter.
 
@@ -65,10 +68,12 @@ class QdrantAdapter:
             grpc_port: Qdrant gRPC port
             prefer_grpc: Whether to prefer gRPC over HTTP
             timeout: Request timeout in seconds (default: 60)
+            project_id: Project identifier for collection namespacing
         """
         self.host = host
         self.port = port
         self.grpc_port = grpc_port
+        self.project_id = project_id
 
         # Extract secret value if SecretStr
         api_key_value = api_key.get_secret_value() if hasattr(api_key, "get_secret_value") else api_key
@@ -81,7 +86,7 @@ class QdrantAdapter:
             prefer_grpc=prefer_grpc,
             timeout=timeout,
         )
-        logger.info("qdrant_adapter_initialized", host=host, port=port)
+        logger.info("qdrant_adapter_initialized", host=host, port=port, project_id=project_id)
 
     async def health_check(self) -> bool:
         """Check if Qdrant is healthy and responsive.
@@ -103,11 +108,12 @@ class QdrantAdapter:
     async def initialize_collections(self) -> None:
         """Initialize all collections with proper schema.
 
-        Creates collections for each memory type if they don't exist.
+        Creates project-namespaced collections for each memory type if they don't exist.
         """
         loop = asyncio.get_running_loop()
 
-        for memory_type, collection_name in COLLECTIONS.items():
+        for memory_type in COLLECTIONS.keys():
+            collection_name = self.get_collection_name(memory_type)
             try:
                 # Check if collection exists
                 exists = await loop.run_in_executor(
@@ -128,7 +134,7 @@ class QdrantAdapter:
                             hnsw_config=HNSW_CONFIG,
                         ),
                     )
-                    logger.info("qdrant_collection_created", collection=collection_name)
+                    logger.info("qdrant_collection_created", collection=collection_name, project_id=self.project_id)
 
                     # Create payload indexes for common query fields
                     await self._create_payload_indexes(collection_name)
@@ -137,6 +143,7 @@ class QdrantAdapter:
                 logger.error(
                     "qdrant_collection_init_failed",
                     collection=collection_name,
+                    project_id=self.project_id,
                     error=str(e),
                 )
                 raise
@@ -730,12 +737,13 @@ class QdrantAdapter:
             logger.error("qdrant_close_failed", error=str(e))
 
     def get_collection_name(self, memory_type: MemoryType) -> str:
-        """Get collection name for a memory type.
+        """Get collection name for a memory type, prefixed with project_id.
 
         Args:
             memory_type: Memory type
 
         Returns:
-            Collection name
+            Collection name with project prefix (e.g., "myproject_functions")
         """
-        return COLLECTIONS[memory_type]
+        base_name = COLLECTIONS[memory_type]
+        return f"{self.project_id}_{base_name}"

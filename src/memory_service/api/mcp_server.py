@@ -3,16 +3,17 @@
 import asyncio
 import json
 import sys
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
-from memory_service.storage.qdrant_adapter import QdrantAdapter
-from memory_service.storage.neo4j_adapter import Neo4jAdapter
-from memory_service.embedding.service import EmbeddingService
 from memory_service.core.memory_manager import MemoryManager
 from memory_service.core.query_engine import QueryEngine
 from memory_service.core.workers import IndexerWorker, JobManager, NormalizerWorker
+from memory_service.embedding.service import EmbeddingService
+from memory_service.storage.neo4j_adapter import Neo4jAdapter
+from memory_service.storage.qdrant_adapter import QdrantAdapter
 from memory_service.utils.logging import get_logger
 from memory_service.utils.metrics import get_metrics
 
@@ -56,6 +57,7 @@ class MCPServer:
         self.qdrant = qdrant
         self.neo4j = neo4j
         self.embedding_service = embedding_service
+        self._current_project_id = qdrant.project_id
 
         # Initialize core services
         self.memory_manager = MemoryManager(
@@ -95,17 +97,17 @@ class MCPServer:
         """Register all MCP tools."""
         from memory_service.api.tools.memory_crud import (
             memory_add,
-            memory_update,
+            memory_bulk_add,
             memory_delete,
             memory_get,
-            memory_bulk_add,
+            memory_update,
         )
         from memory_service.api.tools.search import (
-            memory_search,
             code_search,
-            graph_query,
             find_duplicates,
             get_related,
+            graph_query,
+            memory_search,
         )
 
         # Memory CRUD tools
@@ -253,8 +255,8 @@ class MCPServer:
 
         # Indexing tools
         from memory_service.api.tools.indexing import (
-            index_file,
             index_directory,
+            index_file,
             index_status,
             reindex,
         )
@@ -315,11 +317,11 @@ class MCPServer:
 
         # Maintenance tools
         from memory_service.api.tools.maintenance import (
-            normalize_memory,
-            normalize_status,
-            memory_statistics,
             export_memory,
             import_memory,
+            memory_statistics,
+            normalize_memory,
+            normalize_status,
         )
 
         self._register_tool(
@@ -383,9 +385,9 @@ class MCPServer:
         # Analysis tools
         from memory_service.api.tools.analysis import (
             check_consistency,
-            validate_fix,
             get_design_context,
             trace_requirements,
+            validate_fix,
         )
 
         self._register_tool(
@@ -441,6 +443,10 @@ class MCPServer:
                 "required": ["requirement_id"],
             },
         )
+
+        # Note: set_project and get_project tools removed per REQ-MEM-002-FN-034
+        # Project ID is now immutable, set via --project-id CLI argument at server startup.
+        # To switch projects, restart the server with a different --project-id.
 
     def _register_tool(
         self,
@@ -541,15 +547,16 @@ class MCPServer:
             params: Initialize parameters
 
         Returns:
-            Initialize response
+            Initialize response with project_id
         """
         return self._success_response(
             msg_id,
             {
                 "protocolVersion": "2024-11-05",
                 "serverInfo": {
-                    "name": "memory-service",
-                    "version": "0.1.0",
+                    "name": "claude-memory-mcp",
+                    "version": "0.2.0",
+                    "project_id": self._current_project_id,
                 },
                 "capabilities": {
                     "tools": {"listChanged": False},
@@ -599,7 +606,7 @@ class MCPServer:
         try:
             self._validate_input(tool_name, tool_args)
         except ValidationError as e:
-            raise MCPError(-32602, f"Invalid parameters: {e}")
+            raise MCPError(-32602, f"Invalid parameters: {e}") from e
 
         # Execute tool
         handler = self._tools[tool_name]
@@ -639,7 +646,7 @@ class MCPServer:
             metrics.record_mcp_tool_call(tool_name, "error", duration)
 
             logger.error("tool_call_failed", tool=tool_name, error=str(e))
-            raise MCPError(-32603, f"Tool execution failed: {e}")
+            raise MCPError(-32603, f"Tool execution failed: {e}") from e
 
     def _validate_input(self, tool_name: str, args: dict[str, Any]) -> None:
         """Validate tool input against schema.
