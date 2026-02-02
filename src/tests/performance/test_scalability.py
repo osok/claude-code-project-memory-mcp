@@ -309,14 +309,10 @@ class TestResourceUtilization:
             ]
             await memory_manager.bulk_add_memories(memories)
 
-        # Get collection info
-        collections = await qdrant_adapter.list_collections()
-        total_points = 0
-
-        for collection in collections:
-            info = await qdrant_adapter.get_collection_info(collection)
-            if info:
-                total_points += info.get("points_count", 0)
+        # Count points in the functions collection (where we added memories)
+        from memory_service.storage.qdrant_adapter import COLLECTIONS
+        collection_name = COLLECTIONS[MemoryType.FUNCTION]
+        total_points = await qdrant_adapter.count(collection_name)
 
         print(f"\nMemory efficiency:")
         print(f"  Total points stored: {total_points}")

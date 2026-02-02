@@ -82,8 +82,9 @@ class TestDuplicateDetectionLatency:
                 query=test_code,
                 memory_types=[MemoryType.FUNCTION],
                 limit=10,
-                min_similarity=0.85,  # Duplicate threshold
             )
+            # Filter for duplicates (similarity >= 0.85)
+            duplicates = [r for r in results if r.score >= 0.85]
             duration_ms = (time.perf_counter() - start) * 1000
             metrics.add(duration_ms)
 
@@ -116,8 +117,9 @@ class TestDuplicateDetectionLatency:
                 query=test_code,
                 memory_types=[MemoryType.FUNCTION],
                 limit=10,
-                min_similarity=0.85,
             )
+            # Filter for duplicates (similarity >= 0.85)
+            duplicates = [r for r in results if r.score >= 0.85]
             duration_ms = (time.perf_counter() - start) * 1000
             metrics.add(duration_ms)
 
@@ -157,8 +159,9 @@ class TestDuplicateDetectionAccuracy:
                     query=test_code,
                     memory_types=[MemoryType.FUNCTION],
                     limit=10,
-                    min_similarity=threshold,
                 )
+                # Filter based on threshold
+                filtered = [r for r in results if r.score >= threshold]
                 duration_ms = (time.perf_counter() - start) * 1000
                 metrics.add(duration_ms)
 
@@ -189,9 +192,10 @@ class TestDuplicateDetectionAccuracy:
                 query=func,
                 memory_types=[MemoryType.FUNCTION],
                 limit=5,
-                min_similarity=0.85,
             )
-            results.append(result)
+            # Filter for duplicates
+            duplicates = [r for r in result if r.score >= 0.85]
+            results.append(duplicates)
         duration_ms = (time.perf_counter() - start) * 1000
 
         print(f"\nBatch duplicate check (10 functions):")
@@ -237,9 +241,8 @@ class TestDuplicateDetectionAccuracy:
                 query=near_dup,
                 memory_types=[MemoryType.FUNCTION],
                 limit=5,
-                min_similarity=0.70,
             )
             duration_ms = (time.perf_counter() - start) * 1000
 
-            has_match = any(r.similarity > 0.85 for r in results) if results else False
+            has_match = any(r.score > 0.85 for r in results) if results else False
             print(f"  Query: {near_dup[:50]}... -> Match: {has_match}, Time: {duration_ms:.1f}ms")

@@ -42,7 +42,7 @@ class TestWriteLatency:
 
         # Pre-warm embedding cache
         test_content = "def process_data(input: str) -> Result: Process and return"
-        await memory_manager._embedding_service.embed(test_content)
+        await memory_manager.embedding_service.embed(test_content)
 
         for i in range(OPERATION_COUNT):
             memory = FunctionMemory(

@@ -7,68 +7,91 @@ Tests measure codebase indexing performance:
 """
 
 import asyncio
-import os
 import random
-import tempfile
 import time
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from memory_service.core.workers import IndexerWorker
-from memory_service.core.memory_manager import MemoryManager
+from memory_service.core.workers import IndexerWorker, JobManager
 from memory_service.storage.qdrant_adapter import QdrantAdapter
 from memory_service.storage.neo4j_adapter import Neo4jAdapter
 
 from .conftest import PerformanceMetrics, DeterministicEmbeddingService
 
 
+# Module-level fixtures for sharing across test classes
+@pytest.fixture
+def sample_python_files(tmp_path: Path) -> Path:
+    """Create sample Python files for indexing tests."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+
+    # Create 100 Python files with typical content
+    for i in range(100):
+        module_dir = src_dir / f"module_{i // 10}"
+        module_dir.mkdir(exist_ok=True)
+
+        file_path = module_dir / f"file_{i}.py"
+        content = generate_python_file_content(i, lines=50)
+        file_path.write_text(content)
+
+    return src_dir
+
+
+@pytest.fixture
+def large_python_file(tmp_path: Path) -> Path:
+    """Create a large Python file (1000 lines)."""
+    file_path = tmp_path / "large_module.py"
+    content = generate_python_file_content(0, lines=1000)
+    file_path.write_text(content)
+    return file_path
+
+
+@pytest.fixture
+def multi_language_files(tmp_path: Path) -> Path:
+    """Create files in multiple languages."""
+    src_dir = tmp_path / "multi_lang"
+    src_dir.mkdir()
+
+    # Python files
+    py_dir = src_dir / "python"
+    py_dir.mkdir()
+    for i in range(20):
+        (py_dir / f"file_{i}.py").write_text(
+            generate_python_file_content(i, lines=30)
+        )
+
+    # TypeScript files
+    ts_dir = src_dir / "typescript"
+    ts_dir.mkdir()
+    for i in range(20):
+        (ts_dir / f"file_{i}.ts").write_text(
+            generate_typescript_file_content(i, lines=30)
+        )
+
+    return src_dir
+
+
+@pytest.fixture
+async def indexer_worker(
+    qdrant_adapter: QdrantAdapter,
+    neo4j_adapter: Neo4jAdapter,
+    embedding_service: DeterministicEmbeddingService,
+) -> IndexerWorker:
+    """Create IndexerWorker for testing."""
+    job_manager = JobManager()
+    return IndexerWorker(
+        qdrant=qdrant_adapter,
+        neo4j=neo4j_adapter,
+        job_manager=job_manager,
+        embedding_service=embedding_service,  # type: ignore
+    )
+
+
 class TestIndexingThroughput:
     """Test suite for indexing throughput requirements."""
-
-    @pytest.fixture
-    def sample_python_files(self, tmp_path: Path) -> Path:
-        """Create sample Python files for indexing tests."""
-        src_dir = tmp_path / "src"
-        src_dir.mkdir()
-
-        # Create 100 Python files with typical content
-        for i in range(100):
-            module_dir = src_dir / f"module_{i // 10}"
-            module_dir.mkdir(exist_ok=True)
-
-            file_path = module_dir / f"file_{i}.py"
-            content = generate_python_file_content(i, lines=50)
-            file_path.write_text(content)
-
-        return src_dir
-
-    @pytest.fixture
-    def large_python_file(self, tmp_path: Path) -> Path:
-        """Create a large Python file (1000 lines)."""
-        file_path = tmp_path / "large_module.py"
-        content = generate_python_file_content(0, lines=1000)
-        file_path.write_text(content)
-        return file_path
-
-    @pytest.fixture
-    async def indexer_worker(
-        self,
-        qdrant_adapter: QdrantAdapter,
-        neo4j_adapter: Neo4jAdapter,
-        embedding_service: DeterministicEmbeddingService,
-    ) -> IndexerWorker:
-        """Create IndexerWorker for testing."""
-        memory_manager = MemoryManager(
-            qdrant=qdrant_adapter,
-            neo4j=neo4j_adapter,
-            embedding_service=embedding_service,  # type: ignore
-        )
-        return IndexerWorker(
-            memory_manager=memory_manager,
-            neo4j=neo4j_adapter,
-        )
 
     @pytest.mark.asyncio
     async def test_pt_040_file_indexing_throughput(
@@ -81,14 +104,11 @@ class TestIndexingThroughput:
         Target: Index at least 1000 typical Python files per minute.
         Note: Using smaller test set and extrapolating.
         """
-        metrics = PerformanceMetrics()
-
         # Index directory and measure time
         start = time.perf_counter()
         result = await indexer_worker.index_directory(
             directory=str(sample_python_files),
-            file_patterns=["*.py"],
-            recursive=True,
+            extensions=[".py"],
         )
         duration_sec = time.perf_counter() - start
 
@@ -142,8 +162,7 @@ class TestIndexingThroughput:
         # First pass: full index
         await indexer_worker.index_directory(
             directory=str(sample_python_files),
-            file_patterns=["*.py"],
-            recursive=True,
+            extensions=[".py"],
         )
 
         # Modify some files
@@ -159,9 +178,8 @@ class TestIndexingThroughput:
             start = time.perf_counter()
             result = await indexer_worker.index_directory(
                 directory=str(sample_python_files),
-                file_patterns=["*.py"],
-                recursive=True,
-                incremental=True,
+                extensions=[".py"],
+                force=False,  # Don't force re-index (similar to incremental)
             )
             duration_sec = time.perf_counter() - start
             metrics.add(duration_sec * 1000)
@@ -181,30 +199,6 @@ class TestIndexingThroughput:
 class TestIndexingScaling:
     """Additional tests for indexing performance scaling."""
 
-    @pytest.fixture
-    def multi_language_files(self, tmp_path: Path) -> Path:
-        """Create files in multiple languages."""
-        src_dir = tmp_path / "multi_lang"
-        src_dir.mkdir()
-
-        # Python files
-        py_dir = src_dir / "python"
-        py_dir.mkdir()
-        for i in range(20):
-            (py_dir / f"file_{i}.py").write_text(
-                generate_python_file_content(i, lines=30)
-            )
-
-        # TypeScript files
-        ts_dir = src_dir / "typescript"
-        ts_dir.mkdir()
-        for i in range(20):
-            (ts_dir / f"file_{i}.ts").write_text(
-                generate_typescript_file_content(i, lines=30)
-            )
-
-        return src_dir
-
     @pytest.mark.asyncio
     async def test_multi_language_indexing(
         self,
@@ -215,8 +209,7 @@ class TestIndexingScaling:
         start = time.perf_counter()
         result = await indexer_worker.index_directory(
             directory=str(multi_language_files),
-            file_patterns=["*.py", "*.ts"],
-            recursive=True,
+            extensions=[".py", ".ts"],
         )
         duration_sec = time.perf_counter() - start
 

@@ -102,9 +102,9 @@ class TestGraphTraversalLatency:
 
             start = time.perf_counter()
             results = await query_engine.get_related(
-                memory_id=start_id,
+                entity_id=start_id,
                 relationship_types=[RelationshipType.CALLS, RelationshipType.IMPORTS],
-                max_depth=1,
+                depth=1,
             )
             duration_ms = (time.perf_counter() - start) * 1000
             metrics.add(duration_ms)
@@ -134,9 +134,9 @@ class TestGraphTraversalLatency:
 
             start = time.perf_counter()
             results = await query_engine.get_related(
-                memory_id=start_id,
+                entity_id=start_id,
                 relationship_types=[RelationshipType.CALLS, RelationshipType.IMPORTS],
-                max_depth=2,
+                depth=2,
             )
             duration_ms = (time.perf_counter() - start) * 1000
             metrics.add(duration_ms)
@@ -165,9 +165,9 @@ class TestGraphTraversalLatency:
 
             start = time.perf_counter()
             results = await query_engine.get_related(
-                memory_id=start_id,
+                entity_id=start_id,
                 relationship_types=[RelationshipType.CALLS, RelationshipType.IMPORTS],
-                max_depth=3,
+                depth=3,
             )
             duration_ms = (time.perf_counter() - start) * 1000
             metrics.add(duration_ms)
