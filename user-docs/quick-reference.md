@@ -10,7 +10,7 @@
 
 **Project Isolation:** Data is isolated per `PROJECT_ID`. Each project gets its own namespaced collections and filtered graph data.
 
-All 25 MCP tools organized by category.
+All 23 MCP tools organized by category.
 
 ---
 
@@ -240,23 +240,22 @@ Import from JSONL.
 
 ---
 
-## Project Management (2 tools)
+## Project Isolation
 
-### set_project
-**REQUIRED at session start.** Switch to a project context for data isolation.
-```json
-{"project_id": "my-project-name"}
-```
-| Param | Required | Description |
-|-------|----------|-------------|
-| project_id | Yes | Unique identifier (lowercase alphanumeric + hyphens) |
+Project isolation is configured at **server startup** via the `--project-id` CLI argument in your `.claude/mcp.json`:
 
-### get_project
-Get current project context.
 ```json
-{}
+{
+  "mcpServers": {
+    "memory": {
+      "command": "claude-memory-mcp",
+      "args": ["--project-id", "my-project"]
+    }
+  }
+}
 ```
-Returns: `project_id`, `qdrant_collection_prefix`, `example_collections`
+
+The project ID is immutable for the session. All data operations are automatically scoped to this project.
 
 ---
 
@@ -264,7 +263,7 @@ Returns: `project_id`, `qdrant_collection_prefix`, `example_collections`
 
 | When | Tools |
 |------|-------|
-| Session start | **`set_project`** (required!), then `memory_search` for context |
+| Session start | `memory_search` for context |
 | Before coding | `code_search`, `find_duplicates`, `get_design_context` |
 | During coding | `validate_fix`, `check_consistency` |
 | After coding | `memory_add` (design/session), `index_file` |
