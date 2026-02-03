@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "memory": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/ai/work/claude-code/claude-code-project-memory-mcp/mcp-server/dist/index.js", "--project-id", "claude-memory-mcp"]
+    }
+  }
+}

@@ -240,22 +240,72 @@ Import from JSONL.
 
 ---
 
-## Project Isolation
+## Setup
 
-Project isolation is configured at **server startup** via the `--project-id` CLI argument in your `.claude/mcp.json`:
+### One-Time Global Setup
+
+Install databases and configure credentials once per machine:
+
+```bash
+# 1. Start shared databases
+cd claude-code-memory-service/docker && docker-compose up -d
+
+# 2. Create global config directory
+mkdir -p ~/.config/claude-memory
+
+# 3. Create ~/.config/claude-memory/config.toml with:
+cat > ~/.config/claude-memory/config.toml << 'EOF'
+[voyage]
+api_key = "your-voyage-api-key"
+
+[qdrant]
+url = "http://localhost:6333"
+
+[neo4j]
+uri = "bolt://localhost:7687"
+user = "neo4j"
+password = "your-neo4j-password"
+EOF
+```
+
+### Per-Project Setup
+
+Each project needs a `.mcp.json` in the project root:
 
 ```json
 {
   "mcpServers": {
     "memory": {
-      "command": "claude-memory-mcp",
-      "args": ["--project-id", "my-project"]
+      "type": "stdio",
+      "command": "npx",
+      "args": ["claude-memory-mcp", "--project-id", "my-project"],
+      "env": {
+        "CLAUDE_MEMORY_VOYAGE_API_KEY": "your-api-key"
+      }
     }
   }
 }
 ```
 
-The project ID is immutable for the session. All data operations are automatically scoped to this project.
+Or use environment variables instead of config file:
+
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["claude-memory-mcp", "--project-id", "my-project"],
+      "env": {
+        "CLAUDE_MEMORY_VOYAGE_API_KEY": "${VOYAGE_API_KEY}",
+        "CLAUDE_MEMORY_NEO4J_PASSWORD": "${NEO4J_PASSWORD}"
+      }
+    }
+  }
+}
+```
+
+The project ID isolates all data. Multiple projects share the same databases without data mixing.
 
 ---
 

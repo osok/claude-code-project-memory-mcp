@@ -8,25 +8,42 @@ A development-time memory service for Claude Code that maintains context across 
 
 | Field | Value |
 |-------|-------|
-| **Seq** | 003 |
-| **Name** | Local MCP Architecture |
-| **Requirements** | [REQ-MEM-003-local-mcp-architecture.md](requirement-docs/REQ-MEM-003-local-mcp-architecture.md) |
-| **Task List** | [003-task-list-local-mcp.md](project-docs/003-task-list-local-mcp.md) |
-| **Status** | Complete |
+| **Seq** | 005 |
+| **Name** | NPX-Based MCP Server |
+| **Requirements** | [REQ-MEM-005-npx-mcp-server.md](requirement-docs/REQ-MEM-005-npx-mcp-server.md) |
+| **Architecture** | [005-architecture-npx-mcp.md](project-docs/005-architecture-npx-mcp.md) |
+| **Design** | [005-design-npx-mcp-server.md](design-docs/005-design-npx-mcp-server.md) |
+| **Task List** | [005-task-list-npx-mcp-server.md](project-docs/005-task-list-npx-mcp-server.md) |
+| **ADR** | [ADR-010-typescript-mcp-server.md](project-docs/adrs/ADR-010-typescript-mcp-server.md) |
+| **Status** | Implementation Complete - Ready for Testing |
 
 ### Description
 
-Redesigning the memory service architecture so that:
-- MCP server runs locally as a pip-installable package (NOT in Docker)
-- Databases (Qdrant, Neo4j) remain in Docker as shared infrastructure
-- Project isolation via `--project-id` CLI argument at server startup
-- Global config at `~/.config/claude-memory/config.toml`
-- stdio transport only (no HTTP API for MCP)
+Replaced the Python MCP server with a TypeScript/Node.js implementation:
+- Uses official `@modelcontextprotocol/sdk`
+- npx-based invocation for reliability
+- All 23 tools implemented
+- Same backend databases (Qdrant, Neo4j)
+
+### Completed Tasks
+
+- T001-T008: Project structure, config, adapters, server setup
+- T009-T031: All 23 tools implemented
+- T032: npx entry point created
+- T046-T048: Documentation updated
+
+### Next Steps
+
+1. Test MCP server with Claude Code
+2. Run integration tests
+3. Delete Python code (T049) after verification
 
 ## Previous Work
 
 | Seq | Name | Requirements | Status |
 |-----|------|--------------|--------|
+| 004 | MCP Tool Access Fix | [REQ-MEM-004-mcp-tool-access.md](requirement-docs/REQ-MEM-004-mcp-tool-access.md) | Abandoned - Python MCP unreliable |
+| 003 | Local MCP Architecture | [REQ-MEM-003-local-mcp-architecture.md](requirement-docs/REQ-MEM-003-local-mcp-architecture.md) | Complete |
 | 001 | Initial Memory System | [requirements-memory-docs.md](requirement-docs/requirements-memory-docs.md) | Complete |
 
 ## Development Workflow
@@ -47,15 +64,11 @@ This project uses an agentic development workflow. See `.claude/agents/` for age
 ## Project Structure
 
 ```
-├── src/memory_service/     # Main service code
-│   ├── api/                # MCP server, HTTP server, CLI
-│   ├── core/               # Memory manager, query engine
-│   ├── embedding/          # Voyage client, embedding service
-│   ├── models/             # Pydantic models
-│   ├── parsing/            # Code parsing extractors
-│   ├── storage/            # Qdrant and Neo4j adapters
-│   └── utils/              # Logging, metrics
-├── docker/                 # Database infrastructure only
+├── mcp-server/             # TypeScript MCP server (NEW)
+│   ├── src/                # Source code
+│   ├── package.json        # Dependencies
+│   └── tsconfig.json       # TypeScript config
+├── docker/                 # Database infrastructure
 ├── project-docs/           # Design docs, ADRs, task lists
 ├── requirement-docs/       # Requirements specifications
 ├── user-docs/              # User documentation
@@ -68,11 +81,16 @@ This project uses an agentic development workflow. See `.claude/agents/` for age
 # Start databases
 cd docker && docker-compose up -d
 
-# Run tests
-pytest src/tests/unit/ -v
-pytest src/tests/integration/ -v
+# Build TypeScript MCP server
+cd mcp-server && npm install && npm run build
+
+# Run MCP server locally
+node mcp-server/dist/index.js --project-id my-project
 
 # Lint
-ruff check src/
-ruff format src/
+cd mcp-server && npm run lint
 ```
+
+## Key Documentation
+
+- [Quick Reference](user-docs/quick-reference.md) - All 23 tools with examples

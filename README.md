@@ -14,15 +14,14 @@ Developer Machine
 |                                                  |
 |  +-------------------------------------------+   |
 |  |          Project Directory                |   |
-|  |  .claude/mcp.json (project config)        |   |
-|  |  .venv/ (includes claude-memory-mcp)      |   |
+|  |  .mcp.json (project config)               |   |
 |  +-------------------------------------------+   |
 |                       |                          |
 |                       | stdio                    |
 |                       v                          |
 |  +-------------------------------------------+   |
-|  |       MCP Server (local Python process)   |   |
-|  |       claude-memory-mcp --project-id X    |   |
+|  |     MCP Server (local Node.js process)    |   |
+|  |     npx claude-memory-mcp --project-id X  |   |
 |  +-------------------------------------------+   |
 |                       |                          |
 |          +------------+------------+             |
@@ -49,7 +48,7 @@ Developer Machine
 
 ### Prerequisites
 
-- Python 3.11+
+- Node.js 20+
 - Docker and Docker Compose
 - Voyage AI API key ([Get one here](https://www.voyageai.com/))
 
@@ -69,57 +68,60 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-**2. Install the MCP server:**
+**2. Create global configuration:**
 
 ```bash
-pip install claude-memory-mcp
-# or add to your project's requirements.txt / pyproject.toml
-```
+mkdir -p ~/.config/claude-memory
 
-**3. Initialize global configuration:**
+cat > ~/.config/claude-memory/config.toml << 'EOF'
+[voyage]
+api_key = "your-voyage-api-key"
 
-```bash
-claude-memory-mcp init-config
-# Edit ~/.config/claude-memory/config.toml with:
-#   - Your Voyage AI API key
-#   - Neo4j password (must match .env)
-```
+[qdrant]
+url = "http://localhost:6333"
 
-**4. Verify connectivity:**
-
-```bash
-claude-memory-mcp check-db
+[neo4j]
+uri = "bolt://localhost:7687"
+user = "neo4j"
+password = "your-neo4j-password"
+EOF
 ```
 
 ### Claude Code Integration
 
-**1. Create `.claude/mcp.json` in your project:**
+**Create `.mcp.json` in your project root:**
 
 ```json
 {
   "mcpServers": {
     "memory": {
-      "command": "claude-memory-mcp",
-      "args": ["--project-id", "my-project"]
+      "type": "stdio",
+      "command": "npx",
+      "args": ["claude-memory-mcp", "--project-id", "my-project"]
     }
   }
 }
 ```
 
-If using a project virtual environment:
+Or with environment variables:
 
 ```json
 {
   "mcpServers": {
     "memory": {
-      "command": ".venv/bin/claude-memory-mcp",
-      "args": ["--project-id", "my-project"]
+      "type": "stdio",
+      "command": "npx",
+      "args": ["claude-memory-mcp", "--project-id", "my-project"],
+      "env": {
+        "CLAUDE_MEMORY_VOYAGE_API_KEY": "${VOYAGE_API_KEY}",
+        "CLAUDE_MEMORY_NEO4J_PASSWORD": "${NEO4J_PASSWORD}"
+      }
     }
   }
 }
 ```
 
-**2. Add to your project's `CLAUDE.md`:**
+**Add to your project's `CLAUDE.md`:**
 
 ```markdown
 ## Memory Service
@@ -150,42 +152,33 @@ Uses persistent memory for context across sessions. See [Quick Reference](user-d
 Located at `~/.config/claude-memory/config.toml`:
 
 ```toml
+[voyage]
+api_key = "your-voyage-api-key"
+
 [qdrant]
-host = "localhost"
-port = 6333
+url = "http://localhost:6333"
 
 [neo4j]
 uri = "bolt://localhost:7687"
 user = "neo4j"
 password = "your-password"
-
-[voyage]
-api_key = "your-voyage-api-key"
-model = "voyage-code-3"
-
-[server]
-log_level = "INFO"
 ```
-
-Create with: `claude-memory-mcp init-config`
 
 ### Configuration Precedence
 
-1. CLI arguments (highest priority)
-2. Environment variables (`CLAUDE_MEMORY_*` prefix)
-3. Global config file
-4. Built-in defaults
+1. Environment variables (highest priority)
+2. Global config file
+3. Built-in defaults
 
 ### Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `CLAUDE_MEMORY_QDRANT_HOST` | Qdrant hostname |
-| `CLAUDE_MEMORY_QDRANT_PORT` | Qdrant port |
+| `CLAUDE_MEMORY_QDRANT_URL` | Qdrant URL |
 | `CLAUDE_MEMORY_NEO4J_URI` | Neo4j connection URI |
+| `CLAUDE_MEMORY_NEO4J_USER` | Neo4j user |
 | `CLAUDE_MEMORY_NEO4J_PASSWORD` | Neo4j password |
 | `CLAUDE_MEMORY_VOYAGE_API_KEY` | Voyage AI API key |
-| `CLAUDE_MEMORY_LOG_LEVEL` | Log level |
 
 ## Project Isolation
 
@@ -198,25 +191,16 @@ Each project's data is isolated via `--project-id`. Multiple projects share the 
 
 **For multiple projects:**
 
-Create separate `mcp.json` files in each project with different `--project-id` values. Each project automatically uses its isolated memory space.
+Create separate `.mcp.json` files in each project with different `--project-id` values. Each project automatically uses its isolated memory space.
 
-## CLI Commands
+## CLI Usage
 
 ```bash
 # Start MCP server (requires --project-id)
-claude-memory-mcp --project-id my-project
-
-# Create global config file
-claude-memory-mcp init-config
-
-# Check database connectivity
-claude-memory-mcp check-db
-
-# Show version
-claude-memory-mcp --version
+npx claude-memory-mcp --project-id my-project
 
 # Show help
-claude-memory-mcp --help
+npx claude-memory-mcp --help
 ```
 
 ## Memory Types
@@ -238,14 +222,14 @@ claude-memory-mcp --help
 - `memory_add` - Create new memories
 - `memory_get` - Retrieve memories
 - `memory_update` - Update existing memories
-- `memory_delete` - Soft/hard delete memories
+- `memory_delete` - Soft delete memories
 - `memory_bulk_add` - Batch create memories
 
 ### Search (5 tools)
 - `memory_search` - Semantic search across memories
 - `code_search` - Find similar code patterns
 - `graph_query` - Execute Cypher queries
-- `find_duplicates` - Detect duplicate functions
+- `find_duplicates` - Detect duplicate content
 - `get_related` - Get related entities
 
 ### Indexing (4 tools)
@@ -269,58 +253,65 @@ claude-memory-mcp --help
 
 ## Technology Stack
 
-- **Python 3.11+** - Runtime
+- **TypeScript/Node.js 20+** - Runtime
+- **@modelcontextprotocol/sdk** - Official MCP SDK
 - **Qdrant** - Vector database for semantic search
 - **Neo4j** - Graph database for relationships
-- **Voyage-Code-3** - Code embedding model
-- **Tree-sitter** - Multi-language code parsing
+- **Voyage-Code-3** - Code embedding model (1024 dimensions)
 - **MCP Protocol** - Claude Code integration
 
-## Development
-
-### Running Tests
-
-```bash
-# Unit tests
-pytest src/tests/unit/ -v --cov=memory_service
-
-# Integration tests (requires Docker)
-pytest src/tests/integration/ -v
-
-# Security tests
-pytest src/tests/security/ -v
-```
-
-### Project Structure
+## Project Structure
 
 ```
-├── src/
-│   ├── memory_service/
-│   │   ├── api/          # MCP server, CLI
-│   │   ├── core/         # Memory manager, query engine, workers
-│   │   ├── embedding/    # Voyage client, embedding service
-│   │   ├── models/       # Pydantic models
-│   │   ├── parsing/      # Code parsing extractors
+├── mcp-server/           # TypeScript MCP server
+│   ├── src/
+│   │   ├── index.ts      # CLI entry point
+│   │   ├── server.ts     # MCP server setup
+│   │   ├── context.ts    # Shared tool context
+│   │   ├── config.ts     # TOML config loading
+│   │   ├── tools/        # 23 tool implementations
 │   │   ├── storage/      # Qdrant and Neo4j adapters
-│   │   └── utils/        # Logging, metrics, utilities
-│   └── tests/
+│   │   ├── embedding/    # Voyage AI client
+│   │   └── utils/        # Logging utilities
+│   ├── package.json
+│   └── tsconfig.json
 ├── docker/               # Database docker-compose
 ├── project-docs/         # Architecture and design docs
 ├── user-docs/            # User documentation
 └── CLAUDE.md             # Development workflow
 ```
 
-## Migrating from Docker-based MCP
+## Development
 
-If you were using an earlier version where the MCP server ran inside Docker:
+### Building
 
-1. Stop the old containers: `docker-compose down`
-2. Install the new package: `pip install claude-memory-mcp`
-3. Create global config: `claude-memory-mcp init-config`
-4. Update your `mcp.json` to use the local command instead of `docker exec`
-5. Start databases with new docker-compose: `docker-compose up -d`
+```bash
+cd mcp-server
+npm install
+npm run build
+```
 
-Your existing data in Docker volumes will be preserved.
+### Running locally
+
+```bash
+cd mcp-server
+node dist/index.js --project-id test-project
+```
+
+### Running tests
+
+```bash
+cd mcp-server
+npm test
+```
+
+## Migrating from Python MCP
+
+If you were using the earlier Python-based MCP server:
+
+1. Update your `.mcp.json` to use npx instead of the Python command
+2. Your existing data in Docker volumes will be preserved
+3. No changes needed to database infrastructure
 
 ## License
 
