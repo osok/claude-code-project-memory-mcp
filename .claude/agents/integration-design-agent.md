@@ -100,6 +100,44 @@ existing_doc: design-docs/50-api-contracts.md  # if mode=update
 
 Link to: Frontend Designs, Backend Designs, Agent Designs, Security Design
 
+## Memory Integration
+
+Integration Design Agent uses the Memory MCP to ensure API contracts are consistent and compatible across all services.
+
+### Before Designing
+
+1. **Search for existing API contracts and integration patterns:**
+   ```
+   memory_search(query: "API contract endpoints integration events", memory_types: ["design", "component"])
+   ```
+   - Align naming conventions, error formats, and versioning with existing contracts
+   - Identify existing event schemas to avoid conflicts
+
+2. **Retrieve design context** for connected services:
+   ```
+   get_design_context(component_name: "{integration_name}")
+   ```
+
+3. **Search for all backend and frontend components** that will consume/produce:
+   ```
+   memory_search(query: "backend service frontend app endpoints consumed", memory_types: ["component"])
+   ```
+
+### After Designing
+
+4. **Store API contract specifications:**
+   ```
+   memory_bulk_add(memories: [
+     {memory_type: "component", content: "API Endpoint: {method} {path}. Service: {service}. Auth: {auth}. Request: {schema}. Response: {schema}.", metadata: {"component_name": "{endpoint_path}", "type": "api-endpoint", "work_seq": "{seq}"}},
+     ...
+   ])
+   ```
+
+5. **Store event contracts:**
+   ```
+   memory_add(memory_type: "component", content: "Event: {event_name}. Producer: {service}. Consumers: {list}. Schema: {schema}. Delivery: {guarantee}.", metadata: {"component_name": "{event_name}", "type": "event-contract", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Use template structure

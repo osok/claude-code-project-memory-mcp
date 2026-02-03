@@ -218,6 +218,47 @@ services:
 
 Link to: All component designs, Security Design, Data Design
 
+## Memory Integration
+
+Infrastructure Design Agent uses the Memory MCP to maintain infrastructure consistency and align with existing deployment patterns.
+
+### Before Designing
+
+1. **Search for existing infrastructure decisions:**
+   ```
+   memory_search(query: "infrastructure deployment Docker ECS Fargate AWS services", memory_types: ["design"])
+   ```
+   - Reuse established VPC, networking, and service configurations
+   - Align with existing CI/CD pipeline patterns
+
+2. **Retrieve design context:**
+   ```
+   get_design_context(component_name: "infrastructure")
+   ```
+
+3. **Search for all services** that need infrastructure:
+   ```
+   memory_search(query: "backend service frontend app background agent", memory_types: ["component"])
+   ```
+   - Ensure all components have infrastructure provisioned
+
+4. **Search for security policies** relevant to infrastructure:
+   ```
+   memory_search(query: "security infrastructure IAM network encryption", memory_types: ["design"])
+   ```
+
+### After Designing
+
+5. **Store infrastructure specifications:**
+   ```
+   memory_add(memory_type: "component", content: "Infrastructure: {service}. Compute: {type}. Scaling: {strategy}. Resources: {CPU/memory}. Network: {config}.", metadata: {"component_name": "{service}-infrastructure", "type": "infrastructure", "work_seq": "{seq}"})
+   ```
+
+6. **Store CI/CD and observability decisions:**
+   ```
+   memory_add(memory_type: "design", content: "CI/CD for {service}: Pipeline: {stages}. Observability: {stack}. Alerting: {rules}.", metadata: {"category": "infrastructure-design", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Use template structure

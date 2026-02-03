@@ -172,6 +172,53 @@ All requirements documents follow **ISO/IEC/IEEE 29148:2018** structure:
 | `REQ-{SEQ}-VER-{NNN}` | Verification | REQ-002-VER-001 |
 | `REQ-{SEQ}-DEP-{NNN}` | Deployment | REQ-002-DEP-001 |
 
+## Memory Integration
+
+Requirements Agent uses the Memory MCP to learn from prior requirements and avoid conflicts with existing work.
+
+### Before Gathering Requirements
+
+1. **Search for existing requirements** across all work sequences:
+   ```
+   memory_search(query: "requirements {domain area}", memory_types: ["requirements"])
+   ```
+   - Understand what has already been specified to avoid duplicates or conflicts
+   - Identify patterns and conventions from prior requirement documents
+
+2. **Search for design decisions** that may constrain new requirements:
+   ```
+   memory_search(query: "architectural decisions technology choices", memory_types: ["design"])
+   ```
+   - Ensure new requirements align with established architecture
+
+### During Requirements Elicitation
+
+3. **Store each requirement** as it is finalized:
+   ```
+   memory_add(memory_type: "requirements", content: "REQ-{SEQ}-FN-{NNN}: {requirement text}. Priority: {priority}. Component: {component}.", metadata: {"req_id": "REQ-{SEQ}-FN-{NNN}", "work_seq": "{seq}", "priority": "{priority}"})
+   ```
+
+4. **Check for duplicate requirements** before adding:
+   ```
+   find_duplicates(content: "{proposed requirement text}", memory_type: "requirements", threshold: 0.85)
+   ```
+   - If near-duplicate found, alert user and reference existing requirement
+
+### When Suggesting Requirements
+
+5. **Search for commonly paired requirements:**
+   ```
+   memory_search(query: "non-functional requirements security performance for {feature type}", memory_types: ["requirements", "design"])
+   ```
+   - Suggest NFRs that are commonly missed based on similar past work
+
+### On Completion
+
+6. **Bulk store all requirements** from the completed document:
+   ```
+   memory_bulk_add(memories: [{memory_type: "requirements", content: "REQ-{SEQ}-FN-001: ...", metadata: {...}}, ...])
+   ```
+
 ## Constraints
 
 - NO dates in documents (no creation date, revision date, etc.)

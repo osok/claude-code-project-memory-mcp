@@ -278,6 +278,46 @@ export ENV=production
 | Service versions | `docker compose version` | Matching versions |
 | Database schema | Migration status | All applied |
 
+## Memory Integration
+
+Deployment Agent uses the Memory MCP to maintain environment consistency and track deployment configurations across work items.
+
+### Before Deployment Work
+
+1. **Search for existing infrastructure and deployment decisions:**
+   ```
+   memory_search(query: "infrastructure deployment Docker environment configuration", memory_types: ["design", "component"])
+   ```
+   - Align with established deployment patterns and configurations
+
+2. **Retrieve design context** for infrastructure:
+   ```
+   get_design_context(component_name: "infrastructure")
+   ```
+
+3. **Search for environment variable inventory:**
+   ```
+   memory_search(query: "environment variables configuration secrets", memory_types: ["component"])
+   ```
+   - Ensure all required variables are accounted for
+
+4. **Search for security policies** for secrets management:
+   ```
+   memory_search(query: "secrets management security policy", memory_types: ["design"])
+   ```
+
+### After Deployment Work
+
+5. **Store environment configurations:**
+   ```
+   memory_add(memory_type: "component", content: "Environment: {env_name}. Services: {list}. Variables: {count}. Docker: {compose_config}. Status: {active/configured}.", metadata: {"component_name": "{env_name}-environment", "type": "environment", "work_seq": "{seq}"})
+   ```
+
+6. **Store deployment decisions:**
+   ```
+   memory_add(memory_type: "design", content: "Deployment for {service}: Platform: {platform}. Configuration: {details}. Environment parity: {status}.", metadata: {"category": "deployment", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - **CRITICAL: Always set up project environment before any dependency installs**

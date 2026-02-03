@@ -272,6 +272,103 @@ If implementation requires a dependency not in design:
 3. Wait for Task Manager to route to Design Orchestrator
 4. Proceed only after design update approved
 
+## Memory Integration
+
+Developer Agent uses the Memory MCP to write code that is **structurally identical** to existing components of the same type, reuses base class functionality, and maintains project-wide consistency.
+
+### CRITICAL: Pattern Conformance and Base Class Reuse
+
+**All code must look like it was designed and developed by the same person.** Components of the same type (e.g., all services, all handlers, all agents) MUST share the same structure, naming, patterns, and approaches.
+
+**Never reimplement functionality that exists in a base class, abstract class, or shared utility.** Always search for and use inherited methods rather than writing new versions.
+
+### Before Implementing (MANDATORY)
+
+1. **Find the archetype** - Locate existing components of the same type to use as the structural template:
+   ```
+   code_search(code_snippet: "class {ComponentType}", language: "{language}")
+   memory_search(query: "{component_type} implementation pattern structure", memory_types: ["code_pattern"])
+   ```
+   - Study the archetype's file structure, constructor, method organization, and naming
+   - Your new component MUST mirror this structure
+
+2. **Map the base class hierarchy** - Identify all base/parent classes and their provided methods:
+   ```
+   code_search(code_snippet: "class Base{Type}", language: "{language}")
+   code_search(code_snippet: "class Abstract{Type}", language: "{language}")
+   ```
+   - List every method the base class provides
+   - **NEVER reimplement any of these methods** in the concrete class
+   - Only override methods when the design explicitly requires different behavior
+   - Use `super()` when extending base behavior
+
+3. **Search for shared utilities** before writing helper functions:
+   ```
+   code_search(code_snippet: "{function_name_or_purpose}", language: "{language}")
+   memory_search(query: "utility helper {functionality}", memory_types: ["code_pattern"])
+   ```
+   - If a utility exists for the operation you need, import and use it
+   - Do NOT create local helper functions that duplicate shared utilities
+
+4. **Retrieve design context:**
+   ```
+   get_design_context(component_name: "{component being implemented}")
+   ```
+   - Understand design decisions, API contracts, inheritance hierarchy
+
+5. **Search for established patterns** (error handling, logging, validation):
+   ```
+   memory_search(query: "{language} error handling logging validation pattern", memory_types: ["code_pattern"])
+   ```
+   - Use the EXACT same error handling approach as sibling components
+   - Use the EXACT same logging format, levels, and message structure
+   - Use the EXACT same validation approach and error messages
+
+6. **Search for security policies:**
+   ```
+   memory_search(query: "security policy dependency license {language}", memory_types: ["design"])
+   ```
+
+### During Implementation
+
+7. **Follow the archetype exactly** for:
+   - File and directory naming
+   - Import ordering and grouping
+   - Constructor/initialization patterns
+   - Method ordering (lifecycle, public, private)
+   - Error handling structure (try/catch patterns, error types)
+   - Logging format and verbosity
+   - Configuration loading approach
+   - Dependency injection pattern
+
+8. **Check code consistency** before finalizing:
+   ```
+   check_consistency(code: "{code being written}", component_name: "{component}")
+   ```
+   - If consistency check fails, refactor to match established patterns
+
+9. **Verify no base class reimplementation:**
+   - For each method you write, confirm it doesn't exist in the parent class
+   - If it does exist in the parent, delete your version and use the inherited one
+   - If you need to extend it, call `super()` first, then add your logic
+
+### After Implementation
+
+10. **Index new source files** so future components match yours:
+    ```
+    index_file(file_path: "{new_file_path}", language: "{language}")
+    ```
+
+11. **Store the pattern** if this is the first component of its type (the archetype):
+    ```
+    memory_add(memory_type: "code_pattern", content: "Archetype: {component_type}. Structure: {file organization}. Base class: {base_class}. Constructor pattern: {pattern}. Error handling: {approach}. Logging: {format}. File: {file_path}.", metadata: {"pattern_type": "archetype", "component_type": "{type}", "language": "{language}", "work_seq": "{seq}"})
+    ```
+
+12. **Store base class inventory** if new base class is created:
+    ```
+    memory_add(memory_type: "code_pattern", content: "Base class: {name}. Provided methods: {method_list}. Abstract methods: {abstract_list}. File: {file_path}. Concrete implementations must NOT reimplement: {method_list}.", metadata: {"pattern_type": "base-class", "language": "{language}", "work_seq": "{seq}"})
+    ```
+
 ## Constraints
 
 - Always load and follow convention file

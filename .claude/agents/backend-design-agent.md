@@ -112,6 +112,46 @@ When serving Admin + User frontends:
 
 Link to: Data Design, Security Design, Integration Design, Frontend Designs
 
+## Memory Integration
+
+Backend Design Agent uses the Memory MCP to maintain API consistency and build on established backend patterns.
+
+### Before Designing
+
+1. **Search for existing backend designs and API patterns:**
+   ```
+   memory_search(query: "backend service API design endpoints authentication", memory_types: ["design", "component"])
+   ```
+   - Align API conventions (naming, versioning, error formats) with existing services
+   - Reuse established patterns for auth, validation, error handling
+
+2. **Retrieve design context:**
+   ```
+   get_design_context(component_name: "{service_name}")
+   ```
+
+3. **Search for data entities** the backend will interact with:
+   ```
+   memory_search(query: "data entities schema {related entities}", memory_types: ["component"])
+   ```
+
+4. **Search for security policies:**
+   ```
+   memory_search(query: "security policy authentication authorization", memory_types: ["design"])
+   ```
+
+### After Designing
+
+5. **Store service specifications:**
+   ```
+   memory_add(memory_type: "component", content: "Backend Service: {name}. Endpoints: {count}. Auth: {mechanism}. Dependencies: {services}. Data entities: {entities}.", metadata: {"component_name": "{service_name}", "type": "backend-service", "work_seq": "{seq}"})
+   ```
+
+6. **Store API endpoint inventory:**
+   ```
+   memory_add(memory_type: "design", content: "API endpoints for {service}: {endpoint list with methods}. Versioning: {strategy}.", metadata: {"category": "backend-design", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Use template structure

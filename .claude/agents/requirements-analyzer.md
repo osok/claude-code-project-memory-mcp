@@ -92,6 +92,46 @@ traceability:
     traced_from: [{REQ-IDs}]
 ```
 
+## Memory Integration
+
+Requirements Analyzer uses the Memory MCP to enrich analysis with prior context and store structured results for downstream agents.
+
+### Before Analysis
+
+1. **Search for prior requirement analyses:**
+   ```
+   memory_search(query: "requirements analysis components traceability", memory_types: ["requirements", "design"])
+   ```
+   - Understand existing component mappings from prior work sequences
+   - Identify cross-work dependencies
+
+2. **Retrieve existing requirements** to build complete picture:
+   ```
+   memory_search(query: "REQ-* functional requirements", memory_types: ["requirements"], limit: 50)
+   ```
+   - Include prior requirements in traceability analysis
+
+### After Analysis
+
+3. **Store component identification results:**
+   ```
+   memory_bulk_add(memories: [
+     {memory_type: "component", content: "Component: {name}. Type: {frontend|backend|agent|library}. Requirements: {REQ-IDs}. Dependencies: {list}.", metadata: {"component_name": "{name}", "work_seq": "{seq}"}},
+     ...
+   ])
+   ```
+
+4. **Store cross-cutting concerns** for design agents:
+   ```
+   memory_add(memory_type: "design", content: "Cross-cutting concerns for Seq {seq}: Security: {details}. Performance: {details}. Accessibility: {details}.", metadata: {"category": "cross-cutting", "work_seq": "{seq}"})
+   ```
+
+5. **Trace requirements** to check existing implementations:
+   ```
+   trace_requirements(requirement_text: "{requirement description}")
+   ```
+   - Identify which requirements already have partial implementations
+
 ## Constraints
 
 - Parse all documents before analysis

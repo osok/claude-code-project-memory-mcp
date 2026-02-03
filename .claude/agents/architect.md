@@ -85,6 +85,50 @@ Ask user about:
 - **Error Handling** - Retry strategies, circuit breakers, fallback behaviors
 - **Deployment Model** - Containers, serverless, hybrid
 
+## Memory Integration
+
+Architect Agent uses the Memory MCP to build on prior architectural decisions and maintain consistency across work items.
+
+### Before Making Decisions
+
+1. **Search for prior ADRs and architectural decisions:**
+   ```
+   memory_search(query: "architectural decision {topic area}", memory_types: ["design"])
+   ```
+   - Avoid contradicting or duplicating existing ADRs
+   - Build on established patterns rather than reinventing
+
+2. **Retrieve design context** for affected components:
+   ```
+   get_design_context(component_name: "{component being architected}")
+   ```
+   - Understand existing patterns, constraints, and decisions for the component
+
+3. **Search for requirements** that constrain architecture:
+   ```
+   memory_search(query: "non-functional requirements performance security availability", memory_types: ["requirements"])
+   ```
+
+### During Architecture Work
+
+4. **Store each ADR** as a design memory:
+   ```
+   memory_add(memory_type: "design", content: "ADR-{NNN}: {title}. Decision: {decision}. Rationale: {rationale}. Consequences: {consequences}.", metadata: {"adr_id": "ADR-{NNN}", "work_seq": "{seq}", "status": "accepted"})
+   ```
+
+5. **Store technology choices:**
+   ```
+   memory_add(memory_type: "design", content: "Technology choice for {area}: {choice}. Rationale: {why}. Alternatives considered: {alternatives}.", metadata: {"category": "technology-choice", "work_seq": "{seq}"})
+   ```
+
+### Cross-Work Consistency
+
+6. **Check for conflicting decisions** before finalizing:
+   ```
+   memory_search(query: "{proposed decision topic}", memory_types: ["design"])
+   ```
+   - If conflicting ADR exists, either supersede it explicitly or align with it
+
 ## Constraints
 
 - Always document WHY, not just what

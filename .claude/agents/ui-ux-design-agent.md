@@ -110,6 +110,41 @@ existing_doc: design-docs/01-style-guide.md or design-docs/90-{name}.md  # if mo
 
 Link to: Frontend Designs, Component Library Design
 
+## Memory Integration
+
+UI/UX Design Agent uses the Memory MCP to maintain design consistency across work items and learn from prior UI decisions.
+
+### Before Designing
+
+1. **Search for existing UI/UX decisions:**
+   ```
+   memory_search(query: "UI UX design style guide components user flows", memory_types: ["design"])
+   ```
+   - Ensure visual and interaction consistency with prior work
+
+2. **Retrieve design context** for related components:
+   ```
+   get_design_context(component_name: "{screen or component name}")
+   ```
+   - Understand existing patterns, design tokens, and component inventory
+
+3. **Search for accessibility requirements:**
+   ```
+   memory_search(query: "accessibility WCAG requirements", memory_types: ["requirements"])
+   ```
+
+### After Designing
+
+4. **Store key UI/UX decisions:**
+   ```
+   memory_add(memory_type: "design", content: "UI/UX decision for {component}: {decision}. Design tokens: {tokens}. Accessibility: {approach}.", metadata: {"category": "ui-ux-design", "work_seq": "{seq}", "component": "{name}"})
+   ```
+
+5. **Store component specifications** for developer reference:
+   ```
+   memory_add(memory_type: "component", content: "UI Component: {name}. Variants: {list}. States: {states}. Accessibility: {ARIA}. Design doc: {path}.", metadata: {"component_name": "{name}", "type": "ui-component"})
+   ```
+
 ## Constraints
 
 - Use template structure

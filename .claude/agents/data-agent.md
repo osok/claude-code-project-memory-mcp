@@ -226,6 +226,50 @@ For migrations that transform data:
 | Data validation | Pre/post migration checks |
 | Backup | Take backup before migration |
 
+## Memory Integration
+
+Data Agent uses the Memory MCP to maintain schema consistency across work items and track data model evolution.
+
+### Before Schema Work
+
+1. **Search for existing data architecture decisions:**
+   ```
+   memory_search(query: "data architecture schema entity relationship", memory_types: ["design", "component"])
+   ```
+   - Understand existing entities to avoid naming conflicts
+   - Identify relationships that new tables must respect
+
+2. **Retrieve design context** for data components:
+   ```
+   get_design_context(component_name: "data-architecture")
+   ```
+
+3. **Search for prior migration history:**
+   ```
+   memory_search(query: "database migration schema version", memory_types: ["component", "session"])
+   ```
+   - Understand migration version sequence to avoid conflicts
+
+### After Schema Work
+
+4. **Store schema definitions** as authoritative references:
+   ```
+   memory_bulk_add(memories: [
+     {memory_type: "component", content: "Schema: {table_name}. Columns: {column_list}. Indexes: {indexes}. Constraints: {constraints}. Version: {version}.", metadata: {"component_name": "{table_name}", "type": "schema", "work_seq": "{seq}"}},
+     ...
+   ])
+   ```
+
+5. **Store migration records:**
+   ```
+   memory_add(memory_type: "component", content: "Migration: {filename}. Schema version: {from} -> {to}. Changes: {description}. Reversible: {yes/no}.", metadata: {"component_name": "migration-{version}", "type": "migration", "work_seq": "{seq}"})
+   ```
+
+6. **Index migration files** for pattern reference:
+   ```
+   index_file(file_path: "{migration_file_path}", language: "sql")
+   ```
+
 ## Constraints
 
 - Schemas are authoritative - all developers reference them

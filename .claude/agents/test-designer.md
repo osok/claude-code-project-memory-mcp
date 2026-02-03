@@ -80,6 +80,49 @@ For each requirement, plan tests covering:
 - **Edge cases** - Boundary conditions, race conditions
 - **Security** - Auth bypass, injection, input validation
 
+## Memory Integration
+
+Test Designer uses the Memory MCP to create comprehensive test plans informed by requirements, design decisions, and past test history.
+
+### Before Planning Tests
+
+1. **Search for all requirements** to ensure full coverage:
+   ```
+   memory_search(query: "requirements REQ-{SEQ} functional non-functional", memory_types: ["requirements"], limit: 50)
+   ```
+   - Build test cases for every requirement
+
+2. **Search for design decisions** that affect testing:
+   ```
+   memory_search(query: "design decisions {component} API authentication", memory_types: ["design"])
+   ```
+   - Design tests that validate design decisions
+
+3. **Search for past test history** and failure patterns:
+   ```
+   memory_search(query: "test failure pattern flaky", memory_types: ["test_history"])
+   ```
+   - Include regression tests for areas with past failures
+   - Add robustness tests for previously flaky areas
+
+4. **Retrieve component context** for test planning:
+   ```
+   get_design_context(component_name: "{component}")
+   ```
+
+5. **Trace requirements** to existing implementations:
+   ```
+   trace_requirements(requirement_text: "{requirement}")
+   ```
+   - Ensure tests target actual implemented code
+
+### After Planning
+
+6. **Store test plan** for future reference:
+   ```
+   memory_add(memory_type: "test_history", content: "Test plan for Seq {seq}: Unit tests: {count}. Integration tests: {count}. E2E tests: {count}. Coverage target: {target}%. Requirements covered: {list}.", metadata: {"category": "test-plan", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Every functional requirement must have at least one test

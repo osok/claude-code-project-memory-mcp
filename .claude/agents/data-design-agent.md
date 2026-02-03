@@ -118,6 +118,44 @@ Added fields for Seq {SEQ}:
 
 Link to: Backend Design, Security Design, Infrastructure Design
 
+## Memory Integration
+
+Data Design Agent uses the Memory MCP to maintain data architecture consistency and avoid entity conflicts across work items.
+
+### Before Designing
+
+1. **Search for existing data architecture decisions:**
+   ```
+   memory_search(query: "data architecture entities relationships schema", memory_types: ["design", "component"])
+   ```
+   - Understand existing entities to avoid naming conflicts or redundant tables
+   - Identify existing relationships that new entities must connect to
+
+2. **Retrieve design context** for data components:
+   ```
+   get_design_context(component_name: "data-architecture")
+   ```
+
+3. **Search for related requirements:**
+   ```
+   memory_search(query: "data requirements retention storage", memory_types: ["requirements"])
+   ```
+
+### After Designing
+
+4. **Store entity definitions** for cross-agent reference:
+   ```
+   memory_bulk_add(memories: [
+     {memory_type: "component", content: "Entity: {name}. Table: {schema.table}. Key fields: {fields}. Relationships: {relationships}. Indexes: {indexes}.", metadata: {"component_name": "{entity_name}", "type": "data-entity", "work_seq": "{seq}"}},
+     ...
+   ])
+   ```
+
+5. **Store data design decisions:**
+   ```
+   memory_add(memory_type: "design", content: "Data design for Seq {seq}: Storage type: {type}. Entities added: {list}. Partitioning: {strategy}.", metadata: {"category": "data-design", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Use template structure

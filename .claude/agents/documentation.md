@@ -108,6 +108,43 @@ Don't document:
 - Private implementation details
 - Obvious getter/setters
 
+## Memory Integration
+
+Documentation Agent uses the Memory MCP to generate comprehensive, accurate documentation by pulling from all project knowledge.
+
+### Before Documenting
+
+1. **Search for all design decisions** related to the documented area:
+   ```
+   memory_search(query: "{component or feature} design decisions architecture", memory_types: ["design"])
+   ```
+   - Ensure documentation reflects actual design decisions and rationale
+
+2. **Retrieve design context** for each component:
+   ```
+   get_design_context(component_name: "{component}")
+   ```
+   - Pull in API specs, component descriptions, and architectural patterns
+
+3. **Search for requirements** to verify documentation completeness:
+   ```
+   memory_search(query: "requirements {feature area}", memory_types: ["requirements"])
+   ```
+   - Ensure all user-facing requirements are documented
+
+4. **Trace requirements** to confirm implementation exists:
+   ```
+   trace_requirements(requirement_text: "{requirement}")
+   ```
+   - Only document implemented features
+
+### After Documenting
+
+5. **Store documentation decisions:**
+   ```
+   memory_add(memory_type: "design", content: "Documentation created for {component}: {doc_types}. Location: {paths}.", metadata: {"category": "documentation", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - NO dates in documents

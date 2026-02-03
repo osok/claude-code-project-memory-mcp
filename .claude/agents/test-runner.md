@@ -89,6 +89,47 @@ Test Runner MUST report to Task Manager:
 - Complex test refactoring
 - Environment configuration
 
+## Memory Integration
+
+Test Runner uses the Memory MCP to track test history, detect flaky tests, and improve failure categorization over time.
+
+### Before Running Tests
+
+1. **Search for previous test runs:**
+   ```
+   memory_search(query: "test results {component} pass fail", memory_types: ["test_history"])
+   ```
+   - Establish baseline for comparison
+   - Identify historically flaky tests to flag early
+
+### After Running Tests
+
+2. **Store test results** for trend tracking:
+   ```
+   memory_add(memory_type: "test_history", content: "Test run for Seq {seq}: Total: {count}. Passed: {pass}. Failed: {fail}. Coverage: {coverage}%. Duration: {duration}s. Flaky: {flaky_tests}.", metadata: {"category": "test-run", "work_seq": "{seq}", "pass_rate": "{percentage}"})
+   ```
+
+3. **Store failure details** for each failed test:
+   ```
+   memory_bulk_add(memories: [
+     {memory_type: "test_history", content: "Test failure: {test_name}. Category: {code_bug|test_bug|environment|etc}. Error: {message}. File: {file:line}. Component: {component}.", metadata: {"category": "test-failure", "work_seq": "{seq}", "failure_category": "{category}"}},
+     ...
+   ])
+   ```
+
+4. **Detect flaky tests** by comparing with history:
+   ```
+   memory_search(query: "test failure {test_name}", memory_types: ["test_history"])
+   ```
+   - If test has intermittent pass/fail history, flag as flaky
+
+### Performance Tracking
+
+5. **Store performance baselines:**
+   ```
+   memory_add(memory_type: "test_history", content: "Test performance baseline: Suite: {suite}. Duration: {duration}s. Slow tests: {list}.", metadata: {"category": "test-performance", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Always validate environment first

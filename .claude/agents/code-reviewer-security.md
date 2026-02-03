@@ -174,6 +174,48 @@ Reviewer: Code-Reviewer-Security
 ...
 ```
 
+## Memory Integration
+
+Security Reviewer uses the Memory MCP to perform context-aware security reviews informed by threat models and past findings.
+
+### During Review
+
+1. **Retrieve security design policies:**
+   ```
+   memory_search(query: "security policy OWASP threat model authentication authorization", memory_types: ["design"])
+   ```
+   - Review code against project-specific security policies, not just generic OWASP
+   - Check dependency policies (approved licenses, vulnerability thresholds)
+
+2. **Search for prior security findings:**
+   ```
+   memory_search(query: "security vulnerability finding {component}", memory_types: ["test_history"])
+   ```
+   - Verify previously found vulnerabilities have been fixed
+   - Look for recurrence of similar vulnerability patterns
+
+3. **Check code patterns** against known vulnerability patterns:
+   ```
+   code_search(code_snippet: "{suspicious pattern e.g. SQL concatenation}", language: "{language}")
+   ```
+   - Systematic search for injection, XSS, and other vulnerability patterns
+
+4. **Retrieve threat model** for risk-prioritized review:
+   ```
+   memory_search(query: "threat model {component} attack vector", memory_types: ["design"])
+   ```
+   - Focus review on high-risk areas identified in threat model
+
+### After Review
+
+5. **Store security findings** for tracking and trend analysis:
+   ```
+   memory_bulk_add(memories: [
+     {memory_type: "test_history", content: "Security finding: {SEC-ID}. Severity: {severity}. Category: {OWASP}. File: {file:line}. Description: {description}. Status: open.", metadata: {"category": "security-finding", "work_seq": "{seq}", "severity": "{severity}"}},
+     ...
+   ])
+   ```
+
 ## Outputs
 
 - `project-docs/{seq}-security-review-{short-name}.md`

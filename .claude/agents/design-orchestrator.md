@@ -101,6 +101,50 @@ See [002-design-user-auth.md](002-design-user-auth.md) for full context.
 - Updated foundational docs (01- through 90-) - Existing docs UPDATED
 - `design-docs/00-design-overview.md` - Master overview UPDATED
 
+## Memory Integration
+
+Design Orchestrator uses the Memory MCP to coordinate design agents with full awareness of existing designs and decisions.
+
+### Before Orchestration
+
+1. **Search for existing design decisions** across all components:
+   ```
+   memory_search(query: "design decisions {short_name}", memory_types: ["design", "component"])
+   ```
+   - Understand what designs already exist to determine create vs update mode
+
+2. **Retrieve design context** for each component area:
+   ```
+   get_design_context(component_name: "{component}")
+   ```
+   - Pass this context to each specialized design agent for consistency
+
+3. **Check requirements coverage** from prior work:
+   ```
+   trace_requirements(requirement_text: "{requirement description}")
+   ```
+   - Identify which requirements already have design coverage
+
+### During Orchestration
+
+4. **Provide design agents with memory context** by including in invocation:
+   - Prior design decisions for their domain
+   - Related component patterns
+   - Cross-cutting concerns from requirements analysis
+
+### After Orchestration
+
+5. **Store orchestration summary:**
+   ```
+   memory_add(memory_type: "design", content: "Design orchestration for Seq {seq} {short_name} complete. Documents created/updated: {list}. Coverage: {percentage}%.", metadata: {"category": "orchestration-summary", "work_seq": "{seq}"})
+   ```
+
+6. **Validate no design conflicts** between agents:
+   ```
+   memory_search(query: "design {component_name}", memory_types: ["design"])
+   ```
+   - Check that parallel design agents didn't create conflicting decisions
+
 ## Constraints
 
 - **NEVER duplicate** foundational documents

@@ -105,6 +105,46 @@ Before specifying a dependency:
 
 Link to: Style Guide, UI/UX Design, Backend Design, Component Library
 
+## Memory Integration
+
+Frontend Design Agent uses the Memory MCP to maintain UI consistency and align with existing component patterns.
+
+### Before Designing
+
+1. **Search for existing frontend patterns and components:**
+   ```
+   memory_search(query: "frontend design components state management routing", memory_types: ["design", "component"])
+   ```
+   - Reuse established component patterns and state management approaches
+   - Align with existing style guide and design tokens
+
+2. **Retrieve design context:**
+   ```
+   get_design_context(component_name: "{app_name}")
+   ```
+
+3. **Search for UI/UX design decisions:**
+   ```
+   memory_search(query: "UI UX design style guide user flows", memory_types: ["design"])
+   ```
+
+4. **Search for API endpoints** the frontend will consume:
+   ```
+   memory_search(query: "API endpoints backend service", memory_types: ["design", "component"])
+   ```
+
+### After Designing
+
+5. **Store frontend architecture decisions:**
+   ```
+   memory_add(memory_type: "component", content: "Frontend App: {name}. Framework: {framework}. State: {management}. Pages: {count}. API dependencies: {services}.", metadata: {"component_name": "{app_name}", "type": "frontend-app", "work_seq": "{seq}"})
+   ```
+
+6. **Store component inventory:**
+   ```
+   memory_add(memory_type: "design", content: "Frontend {name} components: {component list}. Routes: {route list}. Bundle strategy: {approach}.", metadata: {"category": "frontend-design", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Use template structure

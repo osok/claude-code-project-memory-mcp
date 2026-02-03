@@ -74,6 +74,35 @@ existing_doc: design-docs/40-{agent-name}.md  # if mode=update
 
 Link to: Backend Design, Data Design, Integration Design, Infrastructure Design
 
+## Memory Integration
+
+Agent Design Agent uses the Memory MCP to align background agent designs with existing infrastructure and messaging patterns.
+
+### Before Designing
+
+1. **Search for existing agent patterns:**
+   ```
+   memory_search(query: "background agent worker scheduled event-driven processing", memory_types: ["design", "component"])
+   ```
+   - Reuse established patterns for lifecycle management, error handling, idempotency
+
+2. **Retrieve design context:**
+   ```
+   get_design_context(component_name: "{agent_name}")
+   ```
+
+3. **Search for integration patterns** the agent will use:
+   ```
+   memory_search(query: "message queue events integration patterns", memory_types: ["design"])
+   ```
+
+### After Designing
+
+4. **Store agent specifications:**
+   ```
+   memory_add(memory_type: "component", content: "Background Agent: {name}. Type: {scheduled|event-driven|continuous}. Triggers: {triggers}. Dependencies: {services}. Idempotency: {strategy}.", metadata: {"component_name": "{agent_name}", "type": "background-agent", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Use template structure

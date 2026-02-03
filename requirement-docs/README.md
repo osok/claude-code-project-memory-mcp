@@ -2,38 +2,56 @@
 
 Place your ISO/IEC/IEEE 29148:2018 compliant requirements documents in this folder.
 
+## File Naming Convention
+
+Requirements documents are named per work sequence:
+
+```
+{seq}-requirements-{short_name}.md
+```
+
+**Examples:**
+- `001-requirements-user-auth.md`
+- `002-requirements-payment-processing.md`
+- `003-requirements-reporting-dashboard.md`
+
 ## Document Structure
 
 Each requirements document should include:
 
 | Section | Content |
 |---------|---------|
-| Header | Document ID, Version, Status, Classification, Compliance |
-| 1. Introduction | Purpose, Scope, Definitions, References |
-| 2. Stakeholder Requirements | Stakeholder identification, needs, goals |
-| 3. System Requirements | Context, functional requirements |
+| Header | Seq, Status, Compliance |
+| 1. Introduction | Purpose, Scope, Definitions |
+| 2. Stakeholder Requirements | Stakeholder identification, needs, constraints |
+| 3. System Requirements | Functional requirements |
 | 4. Interface Requirements | UI specifications, API definitions |
 | 5. Data Requirements | Entities, retention policies |
-| 6. Non-Functional Requirements | Performance, security, accessibility |
+| 6. Non-Functional Requirements | Performance, security, accessibility, availability |
 | 7. Verification Requirements | Testing requirements |
 | 8. Deployment Requirements | Environment strategy, infrastructure |
-| 9. Document Control | Revision history, approvals |
+
+**Note:** No dates, no fake signatures, no traceability matrix (handled separately).
 
 ## Requirement ID Conventions
 
+Requirement IDs include the sequence number to link them to specific work items:
+
 | Pattern | Type | Example |
 |---------|------|---------|
-| `STK-NNN` | Stakeholder | `STK-001`: Admin users |
-| `REQ-XXX-FN-NNN` | Functional | `REQ-SYS-FN-001`: User auth |
-| `REQ-INT-UI-NNN` | UI Interface | `REQ-INT-UI-001`: Dashboard |
-| `REQ-INT-API-NNN` | API Interface | `REQ-INT-API-001`: User API |
-| `REQ-DATA-NNN` | Data Entity | `REQ-DATA-001`: User entity |
-| `REQ-NFR-PERF-NNN` | Performance | `REQ-NFR-PERF-001`: Response time |
-| `REQ-NFR-SEC-NNN` | Security | `REQ-NFR-SEC-001`: Password policy |
-| `REQ-NFR-ACC-NNN` | Accessibility | `REQ-NFR-ACC-001`: WCAG compliance |
-| `REQ-NFR-AVAIL-NNN` | Availability | `REQ-NFR-AVAIL-001`: Uptime |
-| `REQ-VER-NNN` | Verification | `REQ-VER-001`: Test coverage |
-| `REQ-DEP-NNN` | Deployment | `REQ-DEP-001`: Environment config |
+| `STK-{SEQ}-NNN` | Stakeholder | `STK-002-001`: Admin users |
+| `REQ-{SEQ}-FN-NNN` | Functional | `REQ-002-FN-001`: User auth |
+| `REQ-{SEQ}-INT-UI-NNN` | UI Interface | `REQ-002-INT-UI-001`: Dashboard |
+| `REQ-{SEQ}-INT-API-NNN` | API Interface | `REQ-002-INT-API-001`: User API |
+| `REQ-{SEQ}-DATA-NNN` | Data Entity | `REQ-002-DATA-001`: User entity |
+| `REQ-{SEQ}-NFR-PERF-NNN` | Performance | `REQ-002-NFR-PERF-001`: Response time |
+| `REQ-{SEQ}-NFR-SEC-NNN` | Security | `REQ-002-NFR-SEC-001`: Password policy |
+| `REQ-{SEQ}-NFR-ACC-NNN` | Accessibility | `REQ-002-NFR-ACC-001`: WCAG compliance |
+| `REQ-{SEQ}-NFR-AVAIL-NNN` | Availability | `REQ-002-NFR-AVAIL-001`: Uptime |
+| `REQ-{SEQ}-VER-NNN` | Verification | `REQ-002-VER-001`: Test coverage |
+| `REQ-{SEQ}-DEP-NNN` | Deployment | `REQ-002-DEP-001`: Environment config |
+
+**Note:** `{SEQ}` is the 3-digit sequence number (e.g., 001, 002).
 
 ## Requirement Format
 

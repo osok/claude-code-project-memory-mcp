@@ -1,6 +1,6 @@
 ---
 name: task-manager
-description: Orchestrates development workflow. Use when user says "begin work" or needs task coordination.
+description: Orchestrates development workflow. Use when user says "lets begin", "continue", or needs task coordination. Primary coordinator for all work.
 tools: Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 model: opus
 ---
@@ -254,6 +254,96 @@ When Test Runner reports categorized failures:
 
 Routing chain: try first agent, if issue persists, escalate to next.
 
+## Memory Integration
+
+Task Manager uses the Memory MCP to maintain long-term project knowledge across sessions and improve orchestration decisions.
+
+### On Workflow Start (begin/continue)
+
+1. **Search for session context:**
+   ```
+   memory_search(query: "session state work sequence {seq} {short_name}", memory_types: ["session"])
+   ```
+   - Retrieve last session state to detect where work left off
+   - Check for stale in-progress tasks from interrupted sessions
+
+2. **Search for prior decisions:**
+   ```
+   memory_search(query: "architectural decisions {short_name}", memory_types: ["design"])
+   ```
+   - Load context from prior phases to inform current routing
+
+3. **Check system health:**
+   ```
+   memory_statistics()
+   ```
+   - Verify memory system is operational before relying on it
+
+### During Workflow Execution
+
+4. **Before invoking each agent**, search for relevant context:
+   ```
+   get_design_context(component_name: "{component being worked on}")
+   ```
+   - Provide retrieved context to the invoked agent
+
+5. **After each phase transition**, store session state:
+   ```
+   memory_add(memory_type: "session", content: "Phase {phase} completed for Seq {seq} {short_name}. Tasks completed: {list}. Next phase: {next}.")
+   ```
+
+6. **Track requirement coverage** periodically:
+   ```
+   trace_requirements(requirement_text: "REQ-{SEQ}-FN-{NNN}: {description}")
+   ```
+   - Verify requirements are being addressed by implementation
+
+### On Workflow Completion
+
+7. **Store completion summary:**
+   ```
+   memory_add(memory_type: "session", content: "Work Seq {seq} {short_name} completed. All tasks done. Phases completed: {list}. Key decisions: {decisions}.")
+   ```
+
+8. **Index new source files** created during implementation:
+   ```
+   index_directory(directory_path: "{src_directory}", patterns: ["**/*.{lang}"])
+   ```
+
+### Code Consistency Gate
+
+Task Manager enforces code consistency as a **mandatory quality gate** during the review phase.
+
+9. **After Developer completes a task**, run consistency check before proceeding:
+   ```
+   check_consistency(code: "{implemented code}", component_name: "{component}")
+   ```
+   - If the check finds pattern deviations, route back to Developer with specific instructions
+   - Developer MUST fix consistency issues before code review begins
+
+10. **After code review**, verify consistency findings are addressed:
+    - If Integration Reviewer reports consistency violations or base class reimplementations, these are **blocking issues** (same severity as stubs)
+    - Create fix tasks for each violation and route back to Developer
+    - Do NOT proceed to testing until consistency issues are resolved
+
+11. **Store archetype patterns** when the first component of a type is completed:
+    ```
+    memory_add(memory_type: "code_pattern", content: "Archetype established: {component_type}. File: {path}. This is the reference implementation - all future {component_type} components must match this structure.", metadata: {"pattern_type": "archetype", "component_type": "{type}", "work_seq": "{seq}"})
+    ```
+
+### Decision Points
+
+12. **Before routing to agents**, search for similar past issues:
+   ```
+   memory_search(query: "{failure description or gap type}", memory_types: ["test_history", "session"])
+   ```
+   - Use past failure patterns to route more effectively
+
+10. **Validate fixes** before marking tasks complete:
+    ```
+    validate_fix(fix_description: "{what was fixed}", code_changes: "{summary of changes}")
+    ```
+
 ## Constraints
 
 - **Task Manager is the ONLY writer to the task list** - other agents return structured output
@@ -426,9 +516,10 @@ When an agent returns a `<log-entry>` block, Task Manager:
 
 1. **Parse** the JSON from the `<log-entry>` block
 2. **Add metadata**:
-   - `seq`: Increment global sequence counter
+   - `log_seq`: Increment global log sequence counter
+   - `work_seq`: Current work sequence from CLAUDE.md Current Work section
    - `timestamp`: Current UTC time in ISO 8601 format
-   - `parent_seq`: Sequence number of parent invocation (or null)
+   - `parent_log_seq`: Log sequence of parent invocation (or null)
    - `duration_ms`: Time elapsed since START (for COMPLETE/ERROR actions)
 3. **Validate** all required fields are present
 4. **Append** the complete JSON object as a single line to `project-docs/activity.log`
@@ -452,32 +543,45 @@ When an agent returns a `<log-entry>` block, Task Manager:
 
 ### Sequence Tracking
 
-Maintain a global sequence counter:
+Maintain a global log sequence counter:
 
 ```
-seq_counter = 0  # Initialize on workflow start
+log_seq_counter = 0  # Initialize on workflow start
 
-def next_seq():
-    seq_counter += 1
-    return seq_counter
+def next_log_seq():
+    log_seq_counter += 1
+    return log_seq_counter
 ```
 
-- **Never reuse** sequence numbers
-- **Never skip** sequence numbers
-- **Persist** by reading last seq from log on resume
+- **Never reuse** log sequence numbers
+- **Never skip** log sequence numbers
+- **Persist** by reading last log_seq from log on resume
+
+### Work Sequence Tracking
+
+Read the current work sequence from CLAUDE.md:
+
+```
+# Read CLAUDE.md Current Work section
+# Extract: **Seq:** 002
+work_seq = "002"  # String, zero-padded
+```
+
+- **Read once** at workflow start
+- **Include in every log entry** for filtering by work item
 
 ### Parent Tracking
 
 Track invocation hierarchy using a stack:
 
 ```
-parent_stack = []  # Stack of (agent_name, seq) tuples
+parent_stack = []  # Stack of (agent_name, log_seq) tuples
 
 # When invoking agent:
-parent_seq = parent_stack[-1].seq if parent_stack else null
-new_seq = next_seq()
-parent_stack.push((agent_name, new_seq))
-log_entry.parent_seq = parent_seq
+parent_log_seq = parent_stack[-1].log_seq if parent_stack else null
+new_log_seq = next_log_seq()
+parent_stack.push((agent_name, new_log_seq))
+log_entry.parent_log_seq = parent_log_seq
 
 # When agent completes:
 parent_stack.pop()
@@ -488,14 +592,14 @@ parent_stack.pop()
 Track start times for duration calculation:
 
 ```
-start_times = {}  # Map of seq -> start_timestamp
+start_times = {}  # Map of log_seq -> start_timestamp
 
 # On START:
-start_times[seq] = current_time()
+start_times[log_seq] = current_time()
 
 # On COMPLETE or ERROR:
-duration_ms = current_time() - start_times[seq]
-del start_times[seq]
+duration_ms = current_time() - start_times[log_seq]
+del start_times[log_seq]
 ```
 
 ### Log Entry Template
@@ -504,12 +608,13 @@ Task Manager constructs the final log entry:
 
 ```json
 {
-  "seq": {next_seq()},
+  "log_seq": {next_log_seq()},
+  "work_seq": "{current_work_seq}",
   "timestamp": "{ISO 8601 UTC}",
   "agent": "{agent_name}",
   "action": "{ACTION_TYPE}",
   "phase": "{current_phase}",
-  "parent_seq": {parent_seq or null},
+  "parent_log_seq": {parent_log_seq or null},
   "requirements": {from agent log-entry},
   "task_id": {from agent log-entry},
   "details": {from agent log-entry},
@@ -531,19 +636,19 @@ Task Manager constructs the final log entry:
 ### Example Log Sequence
 
 ```jsonl
-{"seq":1,"timestamp":"2024-03-15T10:30:00Z","agent":"task-manager","action":"START","phase":"implementation","parent_seq":null,"requirements":[],"task_id":null,"details":"Beginning implementation phase","files_created":[],"files_modified":[],"decisions":[],"errors":[],"duration_ms":null}
-{"seq":2,"timestamp":"2024-03-15T10:30:05Z","agent":"developer","action":"START","phase":"implementation","parent_seq":1,"requirements":["REQ-AUTH-FN-001"],"task_id":"T001","details":"Implementing authentication handler","files_created":[],"files_modified":[],"decisions":[],"errors":[],"duration_ms":null}
-{"seq":3,"timestamp":"2024-03-15T10:45:00Z","agent":"developer","action":"COMPLETE","phase":"implementation","parent_seq":1,"requirements":["REQ-AUTH-FN-001"],"task_id":"T001","details":"Authentication handler implemented","files_created":["src/auth/handler.go"],"files_modified":["src/routes.go"],"decisions":["Using JWT tokens"],"errors":[],"duration_ms":895000}
+{"log_seq":1,"work_seq":"002","timestamp":"2024-03-15T10:30:00Z","agent":"task-manager","action":"START","phase":"implementation","parent_log_seq":null,"requirements":[],"task_id":null,"details":"Beginning implementation phase","files_created":[],"files_modified":[],"decisions":[],"errors":[],"duration_ms":null}
+{"log_seq":2,"work_seq":"002","timestamp":"2024-03-15T10:30:05Z","agent":"developer","action":"START","phase":"implementation","parent_log_seq":1,"requirements":["REQ-002-FN-001"],"task_id":"T001","details":"Implementing authentication handler","files_created":[],"files_modified":[],"decisions":[],"errors":[],"duration_ms":null}
+{"log_seq":3,"work_seq":"002","timestamp":"2024-03-15T10:45:00Z","agent":"developer","action":"COMPLETE","phase":"implementation","parent_log_seq":1,"requirements":["REQ-002-FN-001"],"task_id":"T001","details":"Authentication handler implemented","files_created":["src/auth/handler.go"],"files_modified":["src/routes.go"],"decisions":["Using JWT tokens"],"errors":[],"duration_ms":895000}
 ```
 
 ### Failure Recovery
 
 If Task Manager session is interrupted:
 
-1. Read `project-docs/activity.log` to get last sequence number
+1. Read `project-docs/activity.log` to get last log sequence number
 2. Check for orphaned START entries (no matching COMPLETE/ERROR)
 3. Log ERROR entries for orphaned starts with `details: "Session interrupted"`
-4. Resume with next sequence number
+4. Resume with next log sequence number
 
 ## Outputs
 

@@ -165,6 +165,105 @@ Seq: {NNN}
 3. Complete password reset flow in AuthService
 ```
 
+## Memory Integration
+
+Integration Reviewer uses the Memory MCP to trace complete integration chains, **enforce code consistency across components**, and **detect reimplemented base class functionality**.
+
+### CRITICAL: Code Consistency and Base Class Reuse Checks
+
+In addition to stub and wiring checks, this reviewer MUST verify:
+- Components of the same type are structurally identical
+- Concrete classes do not reimplement methods available in their base classes
+- Shared utilities are used instead of local duplicates
+
+### During Review
+
+1. **Retrieve integration design contracts:**
+   ```
+   memory_search(query: "API contract endpoint integration event", memory_types: ["design", "component"])
+   ```
+   - Verify implemented endpoints match designed contracts
+   - Check event producers/consumers are properly connected
+
+2. **Search for component inventory:**
+   ```
+   memory_search(query: "frontend backend service agent component", memory_types: ["component"])
+   ```
+   - Build complete picture of all components that should be wired together
+
+3. **Check for stub patterns** using code search:
+   ```
+   code_search(code_snippet: "TODO NotImplementedError not implemented stub placeholder", language: "{language}")
+   ```
+   - Systematic detection of incomplete implementations
+
+4. **Retrieve design context** for each integration chain:
+   ```
+   get_design_context(component_name: "{component}")
+   ```
+   - Understand expected wiring between components
+
+5. **Search for prior integration findings:**
+   ```
+   memory_search(query: "integration review stub wiring gap", memory_types: ["test_history"])
+   ```
+   - Verify previously found gaps have been closed
+
+6. **CRITICAL: Check code consistency across sibling components:**
+   ```
+   memory_search(query: "archetype {component_type} pattern structure", memory_types: ["code_pattern"])
+   code_search(code_snippet: "class {ComponentType}", language: "{language}")
+   ```
+   - Compare each component against the archetype for its type
+   - Flag structural deviations: different method ordering, different error handling, different logging
+   - Flag naming deviations: different variable/function naming conventions
+
+7. **CRITICAL: Detect reimplemented base class functionality:**
+   ```
+   memory_search(query: "base class {base_type} provided methods", memory_types: ["code_pattern"])
+   code_search(code_snippet: "class Base{Type}", language: "{language}")
+   ```
+   - For each concrete class, verify it does NOT reimplement methods from its base class
+   - Check that base class methods are called (not bypassed or duplicated)
+   - Verify `super()` is used when extending (not replacing) base behavior
+
+8. **Detect duplicated utility functions:**
+   ```
+   code_search(code_snippet: "{function_body_pattern}", language: "{language}")
+   ```
+   - Search for similar function implementations across different files
+   - Flag when the same logic appears in multiple places instead of being in a shared utility
+
+### Consistency Report Section
+
+Add to the integration review report:
+
+```markdown
+## Code Consistency Analysis
+
+### Structural Conformance
+| Component | Type | Matches Archetype | Deviations |
+|-----------|------|-------------------|------------|
+| {name} | {type} | Yes/No | {list} |
+
+### Base Class Reuse
+| Concrete Class | Base Class | Reimplemented Methods | Status |
+|----------------|------------|----------------------|--------|
+| {class} | {base} | {methods or "None"} | Pass/Fail |
+
+### Duplicated Logic
+| Pattern | Locations | Should Be |
+|---------|-----------|-----------|
+| {description} | {file1:line, file2:line} | Shared utility in {path} |
+```
+
+### After Review
+
+9. **Store integration and consistency findings:**
+   ```
+   memory_add(memory_type: "test_history", content: "Integration review for Seq {seq}: Stubs: {count}. Wiring gaps: {count}. Consistency violations: {count}. Base class reimplementations: {count}. Duplicated utilities: {count}.", metadata: {"category": "integration-review", "work_seq": "{seq}"})
+   ```
+
 ## Outputs
 
 - `project-docs/{seq}-integration-review-{short-name}.md`
@@ -220,8 +319,12 @@ stubs_found: true | false
 stub_count: {number}
 wiring_gaps_found: true | false
 wiring_gap_count: {number}
+consistency_violations_found: true | false
+consistency_violation_count: {number}
+base_class_reimplementations: {number}
+duplicated_utilities: {number}
 incomplete_chains: {list of feature names with gaps}
 notes: {summary of findings}
 ```
 
-If `stubs_found: true` or `wiring_gaps_found: true`, Task Manager will create tasks to complete the implementations before proceeding to testing.
+If `stubs_found: true`, `wiring_gaps_found: true`, or `consistency_violations_found: true`, Task Manager will create tasks to fix these before proceeding to testing. **Consistency violations and base class reimplementations are blocking issues** with the same severity as stubs.

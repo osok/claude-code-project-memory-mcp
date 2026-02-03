@@ -101,6 +101,74 @@ For each test in the plan:
 4. Add edge case coverage
 5. Verify mocks are properly configured
 
+## Memory Integration
+
+Test Coder uses the Memory MCP to write **structurally uniform tests** that follow the same patterns, fixtures, and conventions across all test files.
+
+### CRITICAL: Test Code Consistency
+
+**All test files must look like they were written by the same person.** Tests for components of the same type (e.g., all service tests, all handler tests) MUST use:
+- The same setup/teardown approach
+- The same mocking strategy and mock factories
+- The same assertion patterns and helpers
+- The same file organization and naming
+- The same shared fixtures and test utilities (not local duplicates)
+
+### Before Writing Tests (MANDATORY)
+
+1. **Find the test archetype** - Locate existing tests for the same component type:
+   ```
+   code_search(code_snippet: "test_{ComponentType} describe {ComponentType}", language: "{language}")
+   memory_search(query: "test pattern archetype {component_type}", memory_types: ["code_pattern"])
+   ```
+   - Study the archetype's file structure, setup/teardown, and assertion style
+   - Your new test file MUST mirror this structure exactly
+
+2. **Search for shared test utilities and fixtures:**
+   ```
+   code_search(code_snippet: "fixture factory mock helper test_util", language: "{language}")
+   ```
+   - Use existing test utilities - do NOT create new local helpers that duplicate shared ones
+   - Reuse existing mock factories and fixture builders
+
+3. **Search for component design context:**
+   ```
+   get_design_context(component_name: "{component under test}")
+   ```
+   - Understand expected behavior, edge cases, and error handling
+
+4. **Search for base class test patterns:**
+   ```
+   code_search(code_snippet: "test Base{Type} test_base", language: "{language}")
+   ```
+   - If base class has tests, concrete class tests should follow the same structure
+   - Concrete class tests should test ONLY the added/overridden behavior, not base class behavior
+
+5. **Search for prior test failures:**
+   ```
+   memory_search(query: "test failure {component} {feature}", memory_types: ["test_history"])
+   ```
+
+### During Test Writing
+
+6. **Check test code consistency:**
+   ```
+   check_consistency(code: "{test code}", component_name: "{test_file}")
+   ```
+   - If consistency check fails, refactor to match the test archetype
+
+### After Writing Tests
+
+7. **Index test files** for pattern reuse:
+   ```
+   index_file(file_path: "{test_file_path}", language: "{language}")
+   ```
+
+8. **Store test archetype** if this is the first test of its kind:
+   ```
+   memory_add(memory_type: "code_pattern", content: "Test archetype: {component_type} tests. Structure: {organization}. Setup: {setup_pattern}. Mocking: {mock_approach}. Assertions: {assertion_style}. Shared fixtures: {fixture_list}. File: {file_path}.", metadata: {"pattern_type": "test-archetype", "component_type": "{type}", "language": "{language}", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Follow test plan specifications

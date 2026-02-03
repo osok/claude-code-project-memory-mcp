@@ -198,6 +198,50 @@ Define policies for third-party dependency management.
 
 Link to: All component designs, Data Design, Infrastructure Design
 
+## Memory Integration
+
+Security Design Agent uses the Memory MCP to maintain a comprehensive security posture across work items and learn from prior threat models.
+
+### Before Designing
+
+1. **Search for existing security decisions:**
+   ```
+   memory_search(query: "security architecture threat model authentication authorization", memory_types: ["design"])
+   ```
+   - Build on existing threat models rather than starting from scratch
+   - Ensure new security controls don't conflict with existing ones
+
+2. **Retrieve security context:**
+   ```
+   get_design_context(component_name: "security-architecture")
+   ```
+
+3. **Search for security requirements:**
+   ```
+   memory_search(query: "security requirements NFR-SEC", memory_types: ["requirements"])
+   ```
+
+4. **Search for prior security review findings:**
+   ```
+   memory_search(query: "security vulnerability finding", memory_types: ["test_history"])
+   ```
+   - Address patterns of vulnerabilities found in prior reviews
+
+### After Designing
+
+5. **Store threat model entries** for security reviewers:
+   ```
+   memory_bulk_add(memories: [
+     {memory_type: "design", content: "Threat: {name}. Category: {STRIDE}. Attack vector: {vector}. Mitigating controls: {controls}. Risk: {level}.", metadata: {"category": "threat-model", "work_seq": "{seq}"}},
+     ...
+   ])
+   ```
+
+6. **Store security policies** for developer and reviewer reference:
+   ```
+   memory_add(memory_type: "design", content: "Security policy: {policy area}. Rules: {rules}. Approved libraries: {list}. License policy: {policy}.", metadata: {"category": "security-policy", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Use template structure

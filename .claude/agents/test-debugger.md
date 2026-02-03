@@ -99,6 +99,49 @@ Always output this format for Task Manager:
 {any other info the fixing agent needs}
 ```
 
+## Memory Integration
+
+Test Debugger uses the Memory MCP to diagnose failures faster by leveraging historical failure data and design context.
+
+### During Investigation
+
+1. **Search for similar past failures:**
+   ```
+   memory_search(query: "{error message or symptom description}", memory_types: ["test_history"])
+   ```
+   - Check if this failure pattern has been seen and resolved before
+   - If found, reference the prior resolution in the diagnosis report
+
+2. **Retrieve design context** for the failing component:
+   ```
+   get_design_context(component_name: "{component under investigation}")
+   ```
+   - Understand intended behavior to distinguish bugs from design flaws
+
+3. **Search for related code patterns:**
+   ```
+   code_search(code_snippet: "{error-producing code pattern}", language: "{language}")
+   ```
+   - Find similar patterns elsewhere that might also be affected
+
+4. **Trace requirements** to check if failure is a requirements gap:
+   ```
+   trace_requirements(requirement_text: "{related requirement}")
+   ```
+
+5. **Validate proposed fix** against design:
+   ```
+   validate_fix(fix_description: "{proposed fix description}", code_changes: "{affected files and changes}")
+   ```
+   - Ensure the fix aligns with design decisions before recommending it
+
+### After Diagnosis
+
+6. **Store diagnosis** for future debuggers:
+   ```
+   memory_add(memory_type: "test_history", content: "Diagnosis: {test_name}. Root cause: {category}. Location: {file:line}. Fix: {recommended action}. Route to: {agent}.", metadata: {"category": "diagnosis", "work_seq": "{seq}", "root_cause": "{category}"})
+   ```
+
 ## Constraints
 
 - Never attempt fixes directly; only diagnose and recommend

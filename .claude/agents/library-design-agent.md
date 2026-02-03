@@ -139,6 +139,41 @@ Before specifying a dependency:
 
 Link to: Style Guide (for UI), Frontend Designs
 
+## Memory Integration
+
+Library Design Agent uses the Memory MCP to ensure library designs are consistent with existing patterns and consumer expectations.
+
+### Before Designing
+
+1. **Search for existing library and component patterns:**
+   ```
+   memory_search(query: "library component API design patterns", memory_types: ["design", "component"])
+   ```
+   - Align API conventions with existing libraries
+   - Avoid duplicating functionality already in other libraries
+
+2. **Retrieve design context** for related libraries:
+   ```
+   get_design_context(component_name: "{library_name}")
+   ```
+
+3. **Search for consumer requirements:**
+   ```
+   memory_search(query: "frontend backend dependencies {library area}", memory_types: ["design"])
+   ```
+
+### After Designing
+
+4. **Store library API specifications:**
+   ```
+   memory_add(memory_type: "component", content: "Library: {name}. Public API: {modules}. Types exported: {types}. Peer dependencies: {deps}. Version: {version}.", metadata: {"component_name": "{library_name}", "type": "library", "work_seq": "{seq}"})
+   ```
+
+5. **Store dependency decisions:**
+   ```
+   memory_add(memory_type: "design", content: "Library {name} dependency decisions: {dependencies with justifications}.", metadata: {"category": "library-design", "work_seq": "{seq}"})
+   ```
+
 ## Constraints
 
 - Use template structure

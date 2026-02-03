@@ -101,6 +101,52 @@ Requirements Doc: {path}
 2. {Specific recommendation}
 ```
 
+## Memory Integration
+
+Requirements Reviewer uses the Memory MCP to perform thorough requirement-to-code traceability validation and **verify implementation consistency**.
+
+### During Review
+
+1. **Retrieve all requirements** for comprehensive coverage check:
+   ```
+   memory_search(query: "REQ-{SEQ} requirements functional interface data", memory_types: ["requirements"], limit: 100)
+   ```
+   - Build complete requirements checklist from memory, not just document parsing
+
+2. **Trace each requirement** to implementation:
+   ```
+   trace_requirements(requirement_text: "REQ-{SEQ}-FN-{NNN}: {description}")
+   ```
+   - Use memory's traceability to quickly locate implementing code
+
+3. **Retrieve design context** for expected behavior:
+   ```
+   get_design_context(component_name: "{component}")
+   ```
+   - Verify implementation matches design intent, not just requirements text
+
+4. **Search for prior review findings:**
+   ```
+   memory_search(query: "requirements review gap {component}", memory_types: ["test_history", "session"])
+   ```
+   - Check if previously identified gaps have been addressed
+
+5. **CRITICAL: Verify implementation follows established patterns:**
+   ```
+   check_consistency(code: "{implemented code}", component_name: "{component}")
+   memory_search(query: "archetype {component_type} pattern", memory_types: ["code_pattern"])
+   ```
+   - Even if a requirement is functionally met, flag it if the implementation deviates from the project's established patterns
+   - A requirement is NOT fully met if the code doesn't follow the project's coding standards
+   - Check that components of the same type implement requirements using the same structural approach
+
+### After Review
+
+6. **Store review results** for trend analysis:
+   ```
+   memory_add(memory_type: "test_history", content: "Requirements review for Seq {seq}: Coverage: {percentage}%. Gaps: {gap_count}. Critical gaps: {list}. Consistency issues: {count}. Fully implemented: {list}.", metadata: {"category": "requirements-review", "work_seq": "{seq}"})
+   ```
+
 ## Outputs
 
 - `project-docs/{seq}-requirements-review-{short-name}.md`
