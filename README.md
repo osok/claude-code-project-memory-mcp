@@ -21,7 +21,7 @@ Developer Machine
 |                       v                          |
 |  +-------------------------------------------+   |
 |  |     MCP Server (local Node.js process)    |   |
-|  |     npx claude-memory-mcp --project-id X  |   |
+|  |  node mcp-server/bin/claude-memory-mcp.js  |   |
 |  +-------------------------------------------+   |
 |                       |                          |
 |          +------------+------------+             |
@@ -89,52 +89,17 @@ EOF
 
 ### Claude Code Integration
 
-**Create `.mcp.json` in your project root:**
+From your project directory, run:
 
-```json
-{
-  "mcpServers": {
-    "memory": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["claude-memory-mcp", "--project-id", "my-project"]
-    }
-  }
-}
+```bash
+claude mcp add memory -- node /path/to/claude-code-project-memory-mcp/mcp-server/bin/claude-memory-mcp.js --project-id my-project
 ```
 
-Or with environment variables:
+Replace `/path/to/` with the actual absolute path to this repository. Use a unique `--project-id` for each project (lowercase, hyphens, underscores only).
 
-```json
-{
-  "mcpServers": {
-    "memory": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["claude-memory-mcp", "--project-id", "my-project"],
-      "env": {
-        "CLAUDE_MEMORY_VOYAGE_API_KEY": "${VOYAGE_API_KEY}",
-        "CLAUDE_MEMORY_NEO4J_PASSWORD": "${NEO4J_PASSWORD}"
-      }
-    }
-  }
-}
-```
+> **Warning:** Do not use `npx claude-memory-mcp`. There is a different, unrelated package with that name on npm.
 
-**Add to your project's `CLAUDE.md`:**
-
-```markdown
-## Memory Service
-
-Uses persistent memory for context across sessions. See [Quick Reference](user-docs/quick-reference.md).
-
-**Workflow:**
-- Session start: `memory_search` for context
-- Before coding: `code_search`, `find_duplicates`, `get_design_context`
-- After coding: `memory_add` for decisions and session summary
-
-**Key tools:** `memory_search`, `code_search`, `find_duplicates`, `get_design_context`, `memory_add`
-```
+After adding, restart Claude Code. The 23 memory tools are automatically discovered via MCP -- no changes needed to your project's `CLAUDE.md`.
 
 ## Documentation
 
@@ -197,10 +162,10 @@ Create separate `.mcp.json` files in each project with different `--project-id` 
 
 ```bash
 # Start MCP server (requires --project-id)
-npx claude-memory-mcp --project-id my-project
+node /path/to/claude-code-project-memory-mcp/mcp-server/bin/claude-memory-mcp.js --project-id my-project
 
 # Show help
-npx claude-memory-mcp --help
+node /path/to/claude-code-project-memory-mcp/mcp-server/bin/claude-memory-mcp.js --help
 ```
 
 ## Memory Types
