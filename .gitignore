@@ -33,70 +33,63 @@ Thumbs.db
 !.env-example
 !.env.example
 
+# Local scripts
+run-chrome.sh
+
 # Python
+venv/
+.venv/
+env/
+.env/
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-build/
-develop-eggs/
+*.egg-info/
+*.egg
 dist/
-downloads/
-eggs/
+build/
 .eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+.Python
+develop-eggs/
 lib/
 lib64/
 parts/
 sdist/
 var/
 wheels/
-*.egg-info/
+*.manifest
+*.spec
+pip-selfcheck.json
 .installed.cfg
-*.egg
-
-# Virtual environments
-venv/
-ENV/
-env/
-.venv/
-
-# Testing
+*.whl
+.mypy_cache/
 .pytest_cache/
 .coverage
 .coverage.*
 htmlcov/
 .tox/
 .nox/
-coverage.xml
-*.cover
-*.py,cover
 .hypothesis/
+.ruff_cache/
+pyrightconfig.json
 
-# Type checking
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pytype/
-
-# Caches
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/install-state.gz
+.pnp.*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.tsbuildinfo
+.eslintcache
 .cache/
-*.cache
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Local configuration
-pip.conf
-
-# Local scripts
-run-chrome.sh
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Logs
-*.log
-logs/
-
-# Docker (local overrides)
-docker-compose.override.yml
