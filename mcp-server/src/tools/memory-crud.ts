@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../context.js";
@@ -48,7 +49,7 @@ export function registerMemoryCrudTools(server: McpServer, ctx: ToolContext): vo
     async (input) => {
       try {
         const embedding = await ctx.voyage.embed(input.content);
-        const memoryId = crypto.randomUUID();
+        const memoryId = randomUUID();
         const now = new Date().toISOString();
 
         const collection = ctx.collectionName(input.memory_type);
@@ -261,7 +262,7 @@ export function registerMemoryCrudTools(server: McpServer, ctx: ToolContext): vo
           const embeddings = await ctx.voyage.embedBatch(texts);
 
           const points = items.map((item, i) => {
-            const memoryId = crypto.randomUUID();
+            const memoryId = randomUUID();
             results.push({ memory_id: memoryId, status: "created" });
 
             return {

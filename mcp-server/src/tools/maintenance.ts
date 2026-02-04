@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createWriteStream, createReadStream, existsSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -92,7 +93,7 @@ export function registerMaintenanceTools(server: McpServer, ctx: ToolContext): v
     },
     async (input) => {
       try {
-        const jobId = crypto.randomUUID();
+        const jobId = randomUUID();
 
         normalizeJobs.set(jobId, {
           status: "running",
@@ -275,7 +276,7 @@ export function registerMaintenanceTools(server: McpServer, ctx: ToolContext): v
               continue;
             }
 
-            const memoryId = record.memory_id || crypto.randomUUID();
+            const memoryId = record.memory_id || randomUUID();
             const embedding = await ctx.voyage.embed(record.content);
 
             await ctx.qdrant.upsert(ctx.collectionName(record.type), {

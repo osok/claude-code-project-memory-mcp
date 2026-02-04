@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, extname, relative } from "node:path";
@@ -83,7 +84,7 @@ export function registerIndexingTools(server: McpServer, ctx: ToolContext): void
 
         const content = readFileSync(input.file_path, "utf-8");
         const language = input.language || detectLanguage(input.file_path);
-        const memoryId = crypto.randomUUID();
+        const memoryId = randomUUID();
         const now = new Date().toISOString();
 
         const embedding = await ctx.voyage.embed(content);
@@ -135,7 +136,7 @@ export function registerIndexingTools(server: McpServer, ctx: ToolContext): void
           return toolError("DIR_NOT_FOUND", `Directory not found: ${input.directory_path}`);
         }
 
-        const jobId = crypto.randomUUID();
+        const jobId = randomUUID();
         const files: string[] = [];
 
         // Find matching files
@@ -178,7 +179,7 @@ export function registerIndexingTools(server: McpServer, ctx: ToolContext): void
             for (const filePath of files) {
               const content = readFileSync(filePath, "utf-8");
               const language = detectLanguage(filePath);
-              const memoryId = crypto.randomUUID();
+              const memoryId = randomUUID();
               const now = new Date().toISOString();
 
               const embedding = await ctx.voyage.embed(content);
