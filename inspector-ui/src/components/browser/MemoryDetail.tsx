@@ -13,6 +13,7 @@ import { useMemory } from '@/hooks/use-memories';
 import { useRelatedNodes } from '@/hooks/use-graph';
 import { cn, formatDate, formatRelativeTime, copyToClipboard, truncate } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
+import { useConfigStore } from '@/stores/config-store';
 import { SyntaxHighlighter } from '@/components/common/SyntaxHighlighter';
 import { MarkdownRenderer, isMarkdownContent } from '@/components/common/MarkdownRenderer';
 import { ExpandedDetailPanel } from '@/components/layout/ExpandedDetailPanel';
@@ -30,6 +31,7 @@ export function MemoryDetail({ type, id, onEdit, onDelete, onNavigate }: MemoryD
   const { data: memory, isLoading, error } = useMemory(type, id);
   const { data: related } = useRelatedNodes(id, 1);
   const { addToast } = useUIStore();
+  const projectId = useConfigStore(state => state.projectId);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMetadata, setShowMetadata] = useState(true);
   const [showRelated, setShowRelated] = useState(false);
@@ -99,7 +101,7 @@ export function MemoryDetail({ type, id, onEdit, onDelete, onNavigate }: MemoryD
                 <tr key={key} className="border-b last:border-0">
                   <td className="px-3 py-2 font-medium bg-muted/50 w-1/3">{key}</td>
                   <td className="px-3 py-2 font-mono text-xs break-all">
-                    {formatMetadataValue(value)}
+                    {formatMetadataValue(value, key, projectId)}
                   </td>
                 </tr>
               ))}
@@ -254,7 +256,7 @@ export function MemoryDetail({ type, id, onEdit, onDelete, onNavigate }: MemoryD
                         <tr key={key} className="border-b last:border-0">
                           <td className="px-3 py-2 font-medium bg-muted/50 w-1/3 text-xs">{key}</td>
                           <td className="px-3 py-2 font-mono text-xs break-all">
-                            {formatMetadataValue(value)}
+                            {formatMetadataValue(value, key, projectId)}
                           </td>
                         </tr>
                       ))}
@@ -311,20 +313,14 @@ export function MemoryDetail({ type, id, onEdit, onDelete, onNavigate }: MemoryD
             </div>
           )}
 
-          {/* Relationships (edges) */}
+          {/* Relationships (edges) - enriched with node labels */}
           {related && related.edges.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="font-semibold text-sm">Relationships</h3>
-              <div className="space-y-1">
-                {related.edges.map((edge) => (
-                  <div key={edge.id} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="font-mono text-xs">{truncate(edge.from, 8)}</span>
-                    <span className="px-2 py-0.5 bg-muted rounded text-xs">{edge.label}</span>
-                    <span className="font-mono text-xs">{truncate(edge.to, 8)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <RelationshipsDisplay
+              edges={related.edges}
+              nodes={related.nodes}
+              currentId={id}
+              onNavigate={onNavigate}
+            />
           )}
         </div>
       </div>
@@ -391,11 +387,139 @@ function ContentDisplay({ content, type, metadata = {}, maxHeight = '400px' }: C
   );
 }
 
-function formatMetadataValue(value: unknown): string {
+function formatMetadataValue(value: unknown, key?: string, projectId?: string): string {
   if (value === null || value === undefined) return '-';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'object') return JSON.stringify(value, null, 2);
-  return String(value);
+
+  const strValue = String(value);
+
+  // Convert absolute file paths to relative paths
+  if (key === 'file_path' && strValue.includes('/')) {
+    return toRelativePath(strValue, projectId);
+  }
+
+  return strValue;
+}
+
+/**
+ * Convert an absolute file path to a relative path for display.
+ * Tries multiple strategies in order:
+ * 1. Find project ID in path (if available)
+ * 2. Find common project root markers (src/, lib/, packages/, etc.)
+ * 3. Fall back to showing last 4 path segments
+ */
+function toRelativePath(absolutePath: string, projectId?: string): string {
+  // Strategy 1: Look for project ID in path
+  if (projectId) {
+    const projectIndex = absolutePath.indexOf(`/${projectId}/`);
+    if (projectIndex !== -1) {
+      return absolutePath.substring(projectIndex + projectId.length + 2);
+    }
+  }
+
+  // Strategy 2: Find common project root markers
+  const markers = [
+    '/src/', '/lib/', '/packages/', '/apps/', '/components/',
+    '/services/', '/modules/', '/core/', '/server/', '/client/',
+    '/api/', '/test/', '/tests/', '/__tests__/', '/spec/',
+  ];
+
+  for (const marker of markers) {
+    const markerIndex = absolutePath.indexOf(marker);
+    if (markerIndex !== -1) {
+      // Include the marker directory in the result
+      return absolutePath.substring(markerIndex + 1);
+    }
+  }
+
+  // Strategy 3: Fall back to last N segments
+  const segments = absolutePath.split('/').filter(Boolean);
+  if (segments.length <= 4) {
+    return absolutePath;
+  }
+  return segments.slice(-4).join('/');
+}
+
+interface RelationshipsDisplayProps {
+  edges: Array<{ id: string; from: string; to: string; label: string }>;
+  nodes: Array<{ id: string; label: string; type: string }>;
+  currentId: string;
+  onNavigate?: (type: string, id: string) => void;
+}
+
+function RelationshipsDisplay({ edges, nodes, currentId, onNavigate }: RelationshipsDisplayProps) {
+  // Create lookup map from node ID to node info
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+  // Group edges by relationship type for better organization
+  const edgesByType = edges.reduce((acc, edge) => {
+    const type = edge.label;
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(edge);
+    return acc;
+  }, {} as Record<string, typeof edges>);
+
+  return (
+    <div className="space-y-2">
+      <h3 className="font-semibold text-sm">Relationships ({edges.length})</h3>
+      <div className="space-y-3">
+        {Object.entries(edgesByType).map(([relType, typeEdges]) => (
+          <div key={relType} className="space-y-1">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              {relType} ({typeEdges.length})
+            </div>
+            <div className="space-y-1 pl-2 border-l-2 border-muted">
+              {typeEdges.map((edge) => {
+                const fromNode = nodeMap.get(edge.from);
+                const toNode = nodeMap.get(edge.to);
+                const isOutgoing = edge.from === currentId;
+
+                // Determine which node to highlight (the "other" node)
+                const otherNode = isOutgoing ? toNode : fromNode;
+                const otherNodeId = isOutgoing ? edge.to : edge.from;
+
+                return (
+                  <div
+                    key={edge.id}
+                    className="flex items-center gap-2 text-sm group"
+                  >
+                    {/* Direction indicator */}
+                    <span className={cn(
+                      "text-xs w-4",
+                      isOutgoing ? "text-green-500" : "text-blue-500"
+                    )}>
+                      {isOutgoing ? '→' : '←'}
+                    </span>
+
+                    {/* Target node info - clickable */}
+                    {otherNode ? (
+                      <button
+                        onClick={() => onNavigate?.(otherNode.type, otherNodeId)}
+                        className="flex items-center gap-2 hover:bg-muted px-2 py-1 rounded flex-1 text-left min-w-0"
+                      >
+                        <Badge variant={otherNode.type as MemoryType} className="shrink-0 text-[10px] px-1.5">
+                          {otherNode.type}
+                        </Badge>
+                        <span className="truncate text-sm" title={otherNode.label}>
+                          {otherNode.label || truncate(otherNodeId, 12)}
+                        </span>
+                        <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0" />
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground text-xs font-mono px-2 py-1">
+                        {truncate(otherNodeId, 12)} (not loaded)
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default MemoryDetail;
