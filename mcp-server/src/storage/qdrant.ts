@@ -20,8 +20,8 @@ export class QdrantAdapter {
 
   allCollections(): string[] {
     const types: readonly MemoryType[] = [
-      "requirements", "design", "code_pattern", "component",
-      "function", "test_history", "session", "user_preference"
+      "requirements", "design", "architecture", "code_pattern", "component",
+      "function", "test_result", "test_history", "session", "user_preference"
     ];
     return types.map(t => this.collectionName(t));
   }
@@ -48,8 +48,8 @@ export class QdrantAdapter {
 
   async ensureAllCollections(): Promise<void> {
     const types: readonly string[] = [
-      "requirements", "design", "code_pattern", "component",
-      "function", "test_history", "session", "user_preference"
+      "requirements", "design", "architecture", "code_pattern", "component",
+      "function", "test_result", "test_history", "session", "user_preference"
     ];
     for (const type of types) {
       await this.ensureCollection(type);
@@ -111,6 +111,37 @@ export class QdrantAdapter {
     // Sort by score descending and limit
     results.sort((a, b) => b.score - a.score);
     return results.slice(0, params.limit);
+  }
+
+  // Simple similarity search with a vector in a single collection
+  async searchSimilar(
+    collection: string,
+    vector: number[],
+    limit: number = 5,
+    scoreThreshold: number = 0.7
+  ): Promise<Array<{ id: string; score: number }>> {
+    try {
+      const searchResult = await this.client.search(collection, {
+        vector,
+        limit,
+        score_threshold: scoreThreshold,
+        filter: {
+          must: [
+            { key: "project_id", match: { value: this.projectId } },
+            { key: "deleted", match: { value: false } }
+          ]
+        },
+        with_payload: false
+      });
+
+      return searchResult.map(hit => ({
+        id: String(hit.id),
+        score: hit.score
+      }));
+    } catch {
+      // Collection may not exist
+      return [];
+    }
   }
 
   async get(collection: string, id: string): Promise<Point | null> {

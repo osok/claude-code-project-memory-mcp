@@ -129,50 +129,7 @@ Upon user confirmation:
    - Any content marked with `<!-- PROJECT-SPECIFIC -->`
    - Project title/description if customized
 
-### Step 6: Clean Up CLAUDE.md in Dependent Projects
-
-After upgrading the framework source, check if CLAUDE.md in dependent projects (i.e., the current project if it uses the framework) contains stale framework sections that were removed or renamed in the new version.
-
-#### Process:
-
-1. **Compare section headings** between the upgraded CLAUDE.md and the previous version
-2. **Identify removed or renamed framework sections** — sections present in the old framework but absent in the new one
-3. **Identify stale framework content** — framework boilerplate that no longer matches any section in the updated source (e.g., old workflow tables, deprecated commands, removed agent references)
-4. **Present each removal to the user** with:
-   - The section name or content being removed
-   - Why it's being removed (e.g., "This section was removed from the framework source", "This agent reference no longer exists")
-   - Whether the content appears to contain project-specific additions that should be preserved
-
-5. **Ask for user confirmation** before each removal or batch of removals:
-   ```
-   ## CLAUDE.md Cleanup
-
-   The following framework content is stale and can be removed:
-
-   1. **Section "Old Workflow"** (lines 45-62)
-      Reason: Removed from framework source.
-      Contains project-specific content: No
-
-   2. **Agent reference "deprecated-agent"** (line 120)
-      Reason: Agent no longer exists in framework.
-      Contains project-specific content: No
-
-   3. **Section "Legacy Commands"** (lines 200-215)
-      Reason: Replaced by "Commands" section in new framework.
-      Contains project-specific content: Yes — has custom project commands mixed in.
-      Recommendation: Keep project-specific commands, remove only framework boilerplate.
-
-   Remove these? (y/n/select individually)
-   ```
-
-6. **Never remove without showing the user first** — even obvious stale content must be presented
-7. **If project-specific content is mixed in**, highlight it and recommend keeping the project parts while removing only the framework parts
-
-#### Why This Matters
-
-CLAUDE.md in dependent projects contains both framework sections and project-specific content. When the framework evolves (sections renamed, removed, or restructured), the dependent project's CLAUDE.md can accumulate stale framework content that conflicts with or duplicates the new version. This step ensures clean upgrades without silently losing project-specific information.
-
-### Step 7: Post-Upgrade Validation
+### Step 6: Post-Upgrade Validation
 
 After upgrade:
 
@@ -320,8 +277,6 @@ Upgrade Agent uses the Memory MCP to preserve project knowledge during framework
 - [ ] User confirmed upgrade
 - [ ] Framework files updated from source
 - [ ] Project-specific content preserved
-- [ ] Stale CLAUDE.md content identified and presented to user
-- [ ] User approved all removals before execution
 - [ ] Missing directories created
 - [ ] Post-upgrade validation passed
 - [ ] Summary of changes reported
@@ -383,30 +338,11 @@ Agent: Upgrading...
 ✓ Added .claude/agents/new-agent.md
 ✓ Added conventions/testing/rust.md
 
-## CLAUDE.md Cleanup
-
-The following stale framework content was found:
-
-1. **Section "Old Parallel Execution"** (lines 180-195)
-   Reason: Replaced by updated "Parallel Execution" section.
-   Contains project-specific content: No
-
-2. **Reference to "deprecated-agent"** (line 45 in Sub-Agent Index)
-   Reason: Agent removed from framework.
-   Contains project-specific content: No
-
-Remove these? (y/n/select individually)
-
-User: y
-
-Agent: ✓ Removed stale section "Old Parallel Execution"
-✓ Removed stale reference to "deprecated-agent"
-
 Post-upgrade validation...
 ✓ All agent files have valid YAML front-matter
 ✓ CLAUDE.md has all required sections
 
-Upgrade complete. 5 files updated, 2 files added, 2 stale items cleaned up.
+Upgrade complete. 5 files updated, 2 files added.
 
 upgrade ending...
 ```

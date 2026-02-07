@@ -5,6 +5,82 @@ import type { ToolContext } from "../context.js";
 import { MEMORY_TYPES } from "../types/memory.js";
 import { logger } from "../utils/logger.js";
 
+/**
+ * REQ-007-FN-060, FN-061: Test result suite cleanup
+ * When storing test results with suite_name/suite_id, automatically cleanup
+ * old test results from the same suite.
+ */
+async function cleanupOldTestResults(
+  ctx: ToolContext,
+  suiteName: string | undefined,
+  suiteId: string | undefined,
+  keepCount: number = 10
+): Promise<number> {
+  if (!suiteName && !suiteId) {
+    return 0;
+  }
+
+  const collection = ctx.collectionName("test_result");
+  let cleanedCount = 0;
+
+  try {
+    // Build filter for suite matching
+    const mustConditions: Array<{ key: string; match: { value: unknown } }> = [
+      { key: "project_id", match: { value: ctx.projectId } },
+      { key: "deleted", match: { value: false } }
+    ];
+
+    if (suiteId) {
+      mustConditions.push({ key: "metadata.suite_id", match: { value: suiteId } });
+    } else if (suiteName) {
+      mustConditions.push({ key: "metadata.suite_name", match: { value: suiteName } });
+    }
+
+    // Get existing test results for this suite
+    const existingResults = await ctx.qdrant.scroll(collection, {
+      filter: { must: mustConditions },
+      limit: 1000
+    });
+
+    // Sort by created_at descending (newest first)
+    const sorted = existingResults.points.sort((a, b) => {
+      const aTime = String((a.payload as Record<string, unknown>).created_at || "");
+      const bTime = String((b.payload as Record<string, unknown>).created_at || "");
+      return bTime.localeCompare(aTime);
+    });
+
+    // Mark old results as deleted (keep the newest 'keepCount')
+    const toDelete = sorted.slice(keepCount);
+    const now = new Date().toISOString();
+
+    for (const point of toDelete) {
+      await ctx.qdrant.upsert(collection, {
+        id: point.id as string,
+        vector: point.vector as number[],
+        payload: {
+          ...point.payload,
+          deleted: true,
+          updated_at: now
+        }
+      });
+      cleanedCount++;
+    }
+
+    if (cleanedCount > 0) {
+      logger.info("Cleaned up old test results", {
+        suite_name: suiteName,
+        suite_id: suiteId,
+        cleaned_count: cleanedCount
+      });
+    }
+  } catch (error) {
+    // Collection might not exist yet, ignore
+    logger.debug("Could not cleanup old test results", { error: String(error) });
+  }
+
+  return cleanedCount;
+}
+
 const MemoryTypeSchema = z.enum(MEMORY_TYPES);
 
 const RelationshipSchema = z.object({
@@ -12,8 +88,50 @@ const RelationshipSchema = z.object({
   target_id: z.string().uuid()
 });
 
+// Memory types that should create Neo4j graph nodes for relationship tracking
+const GRAPH_ELIGIBLE_TYPES = [
+  "requirements",    // Requirements → implemented by designs/components
+  "design",          // Designs → implement requirements, guide components
+  "architecture",    // ADRs → guide designs and components
+  "component",       // Components → contain functions, implement designs
+  "function",        // Functions → belong to components
+  "test_result"      // Test results → verify components/requirements
+];
+
 function needsGraphNode(memoryType: string): boolean {
-  return ["component", "function", "design", "requirements"].includes(memoryType);
+  return GRAPH_ELIGIBLE_TYPES.includes(memoryType);
+}
+
+// Infer relationship type based on source and target memory types
+function inferRelationshipType(sourceType: string, targetType: string): string {
+  // Architecture guides everything
+  if (sourceType === "architecture" && targetType === "requirements") return "GUIDES";
+  if (sourceType === "architecture" && targetType === "design") return "GUIDES";
+  if (sourceType === "architecture" && targetType === "component") return "GUIDES";
+
+  // Design implements requirements
+  if (sourceType === "design" && targetType === "requirements") return "IMPLEMENTS";
+  if (sourceType === "requirements" && targetType === "design") return "IMPLEMENTED_BY";
+
+  // Components implement designs
+  if (sourceType === "component" && targetType === "design") return "IMPLEMENTS";
+  if (sourceType === "design" && targetType === "component") return "IMPLEMENTED_BY";
+
+  // Functions belong to components
+  if (sourceType === "function" && targetType === "component") return "BELONGS_TO";
+  if (sourceType === "component" && targetType === "function") return "CONTAINS";
+
+  // Test results verify components and requirements
+  if (sourceType === "test_result" && targetType === "component") return "TESTS";
+  if (sourceType === "test_result" && targetType === "requirements") return "VERIFIES";
+  if (sourceType === "component" && targetType === "test_result") return "TESTED_BY";
+  if (sourceType === "requirements" && targetType === "test_result") return "VERIFIED_BY";
+
+  // Components can depend on other components
+  if (sourceType === "component" && targetType === "component") return "DEPENDS_ON";
+
+  // Default: semantic similarity
+  return "RELATED_TO";
 }
 
 function toolResult(data: unknown) {
@@ -48,6 +166,14 @@ export function registerMemoryCrudTools(server: McpServer, ctx: ToolContext): vo
     },
     async (input) => {
       try {
+        // REQ-007-FN-061: Auto-cleanup old test results when storing new suite results
+        let cleanedCount = 0;
+        if (input.memory_type === "test_result" && input.metadata) {
+          const suiteName = input.metadata.suite_name as string | undefined;
+          const suiteId = input.metadata.suite_id as string | undefined;
+          cleanedCount = await cleanupOldTestResults(ctx, suiteName, suiteId);
+        }
+
         const embedding = await ctx.voyage.embed(input.content);
         const memoryId = randomUUID();
         const now = new Date().toISOString();
@@ -70,13 +196,18 @@ export function registerMemoryCrudTools(server: McpServer, ctx: ToolContext): vo
         // Create Neo4j node if applicable
         if (needsGraphNode(input.memory_type)) {
           try {
+            // Store content summary in Neo4j for meaningful graph labels
+            const contentSummary = input.content.substring(0, 500);
             await ctx.neo4j.createNode(
               input.memory_type.charAt(0).toUpperCase() + input.memory_type.slice(1),
               memoryId,
-              input.metadata || {}
+              {
+                content: contentSummary,
+                ...(input.metadata || {})
+              }
             );
 
-            // Create relationships
+            // Create explicit relationships if provided
             if (input.relationships) {
               for (const rel of input.relationships) {
                 await ctx.neo4j.createRelationship(
@@ -86,12 +217,49 @@ export function registerMemoryCrudTools(server: McpServer, ctx: ToolContext): vo
                 );
               }
             }
+
+            // Auto-infer relationships by semantic similarity
+            // Search other graph-eligible types for related memories
+            const autoRelationships: Array<{ targetId: string; type: string }> = [];
+            const graphTypes = GRAPH_ELIGIBLE_TYPES.filter(t => t !== input.memory_type);
+
+            for (const searchType of graphTypes) {
+              try {
+                const searchCollection = ctx.collectionName(searchType);
+                const similar = await ctx.qdrant.searchSimilar(searchCollection, embedding, 3, 0.75);
+
+                for (const match of similar) {
+                  const targetId = match.id;
+                  // Determine relationship type based on source/target types
+                  const relType = inferRelationshipType(input.memory_type, searchType);
+                  autoRelationships.push({ targetId, type: relType });
+                }
+              } catch {
+                // Collection may not exist yet, skip silently
+              }
+            }
+
+            // Create auto-inferred relationships
+            for (const rel of autoRelationships) {
+              try {
+                await ctx.neo4j.createRelationship(memoryId, rel.type, rel.targetId);
+                logger.info("Auto-created relationship", { from: memoryId, type: rel.type, to: rel.targetId });
+              } catch (error) {
+                logger.warn("Failed to create auto-relationship", { error: String(error) });
+              }
+            }
           } catch (error) {
             logger.warn("Failed to create graph node", { error: String(error) });
           }
         }
 
-        return toolResult({ memory_id: memoryId, status: "created" });
+        const autoRelCount = needsGraphNode(input.memory_type) ? undefined : 0;
+        return toolResult({
+          memory_id: memoryId,
+          status: "created",
+          ...(autoRelCount !== undefined ? { auto_relationships: autoRelCount } : {}),
+          ...(cleanedCount > 0 ? { old_test_results_cleaned: cleanedCount } : {})
+        });
       } catch (error) {
         logger.error("memory_add failed", { error: String(error) });
         return toolError("CREATE_ERROR", String(error));

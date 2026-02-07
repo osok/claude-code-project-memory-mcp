@@ -49,13 +49,22 @@ Update the task list **immediately** when:
 ### Initial Start ("begin work")
 1. Read Claude.md to get current work context
 2. Load requirements document for current sequence
-3. Execute planning phase:
-   - Architect Agent (creates architecture, ADRs)
-   - Requirements Analyzer (parses requirements structure)
-   - Design Orchestrator (coordinates specialized design agents)
-4. Create task list: `project-docs/{seq}-task-list-{short-name}.md` (**IMPORTANT**)
-5. Execute implementation phase (see workflow order below)
-6. Update Claude.md when work complete
+3. **Initialize activity log** (see Activity Log Management below) — this MUST happen before any agent is invoked
+4. Log Task Manager START entry
+5. **Architecture phase** — invoke and log each agent:
+   - Architect Agent (creates architecture, ADRs) — log START before, COMPLETE after
+6. **Design phase** — invoke and log each agent:
+   - Requirements Analyzer (parses requirements structure) — log START/COMPLETE
+   - Design Orchestrator (coordinates specialized design agents) — log START/COMPLETE
+   - Design Orchestrator sub-agents are logged by Design Orchestrator's log entries
+7. **Planning phase** — invoke and log each agent:
+   - Test Designer Agent — log START/COMPLETE
+   - Data Agent — log START/COMPLETE
+8. Create task list: `project-docs/{seq}-task-list-{short-name}.md` (**IMPORTANT**)
+9. Execute implementation phase (see workflow order below) — continue logging all agents
+10. Update Claude.md when work complete
+
+**CRITICAL: Every agent invocation from step 5 onward MUST have a START log entry written BEFORE the agent runs and a COMPLETE/ERROR entry written IMMEDIATELY after.** This includes architecture and design agents, not just implementation agents.
 
 ### Session Resume ("continue")
 1. Read task list for current sequence
@@ -98,11 +107,15 @@ Seq: {NNN} | Requirements: {req-doc} | Design: {design-doc}
    - Code Reviewer - Requirements Agent
    - Code Reviewer - Security Agent
    - Code Reviewer - Integration Agent
-6. **Fix Phase** (if reviewers found issues):
-   - Create tasks for each gap/vulnerability/stub
-   - Route to appropriate agent (Developer, Data Agent, etc.)
-   - Re-run affected reviewers after fixes
-7. Test Designer Agent (review/update)
+6. **Review Resolution Phase** (if any reviewer found issues):
+   a. Collect all findings into findings tracker (see Code Review Resolution Workflow)
+   b. Route each finding to correct agent (Architect, Design Orchestrator, Developer, etc.)
+   c. Test Designer assesses findings for test impact, updates test plan
+   d. Execute fix tasks, record resolutions in findings tracker
+   e. Re-invoke reviewers that had findings (re-review mode)
+   f. If new findings: loop to 6b for new findings only
+   g. Gate: all findings must be `verified` before proceeding
+7. Test Designer Agent (review/update test plan — final check)
 8. Test Coder Agent(s)
 9. Test Runner Agent
 10. Documentation Agent(s)
@@ -214,13 +227,134 @@ When a gap is found, Task Manager evaluates and routes based on gap type:
 4. If design and schema exist: route to Developer
 5. If requirement itself is unclear: ask user before routing
 
-## Code Review Handling
+## Code Review Resolution Workflow
 
-When code reviewers return results:
+When code reviewers return results, Task Manager executes a structured resolution workflow that ensures all findings are addressed, tracked, and verified.
+
+### Step 1: Collect and Record Findings
+
+After all three code reviewers complete, Task Manager:
+
+1. **Creates a findings tracker** in the task list as a new section:
+
+```markdown
+## Code Review Findings
+
+| Finding ID | Reviewer | Severity | Description | Route To | Fix Task | Status | Resolution |
+|------------|----------|----------|-------------|----------|----------|--------|------------|
+| CR-001 | requirements | high | Missing user export feature | Developer | T015 | open | |
+| CR-002 | security | critical | SQL injection in query.ts:42 | Developer | T016 | open | |
+| CR-003 | requirements | high | No design for batch processing | Design Orchestrator | T017 | open | |
+| CR-004 | integration | medium | Stub in OrderService.create() | Developer | T018 | open | |
+```
+
+2. **Preserve review reports** - The review report files (`{seq}-*-review-{name}.md`) are the permanent record. Never delete or overwrite them during resolution.
+
+### Step 2: Route Findings to Correct Agent
+
+Each finding is evaluated and routed based on its nature, not just its source:
+
+| Finding Nature | Indicators | Route To | Example |
+|---------------|------------|----------|---------|
+| **Architecture issue** | Cross-cutting concern, missing integration pattern, fundamental design flaw | Architect Agent | "Authentication model doesn't support multi-tenant" |
+| **Design gap** | Feature referenced but no design exists, design doesn't cover the scenario | Design Orchestrator → then Developer | "No design for batch processing workflow" |
+| **Security architecture gap** | Systemic security issue, missing security layer | Security Design Agent → Developer | "No rate limiting strategy defined" |
+| **Data model issue** | Missing entity, relationship, or field in schema | Data Agent → Developer | "Orders table missing foreign key to users" |
+| **Implementation fix** | Design exists, code is wrong or incomplete | Developer | "SQL injection in query builder" |
+| **Integration wiring** | Components exist but aren't connected | Developer | "Frontend calls /api/export but no route exists" |
+| **Consistency violation** | Code doesn't match established patterns | Developer (with archetype reference) | "UserService doesn't extend BaseService" |
+
+**Routing rules:**
+- If the fix requires changing a design document → route to the appropriate Design Agent first, then Developer
+- If the fix requires an architectural decision → route to Architect first
+- If the fix is purely code-level → route directly to Developer
+- If multiple agents are needed, create chained tasks with dependencies
+
+### Step 3: Involve Test Designer
+
+After findings are routed but **before fix work begins**, invoke Test Designer to assess test impact:
+
+1. Pass the full findings list to Test Designer
+2. Test Designer reviews each finding and determines:
+   - Do existing tests need to be updated?
+   - Are new tests needed to cover the finding?
+   - Should regression tests be added to prevent recurrence?
+3. Test Designer updates the test plan (`{seq}-test-plan-{name}.md`) with:
+   - New test cases linked to finding IDs
+   - Modified test cases with change rationale
+4. Task Manager creates Test Coder tasks for any new/changed tests (to be executed after fixes)
+
+### Step 4: Execute Fixes
+
+For each finding task:
+
+1. Invoke the routed agent with:
+   - The finding details (ID, description, severity, recommendation from reviewer)
+   - The review report file path for full context
+   - Any design/architecture context needed
+2. When the agent completes, **immediately update the findings tracker**:
+   - Set Status to `resolved`
+   - Record the Resolution (what was done and how)
+
+```markdown
+| CR-001 | requirements | high | Missing user export feature | Developer | T015 | resolved | Implemented CSV/JSON export in src/services/export.ts, added route POST /api/users/export |
+| CR-002 | security | critical | SQL injection in query.ts:42 | Developer | T016 | resolved | Replaced string concatenation with parameterized query using prepared statements |
+```
+
+### Step 5: Re-Review (Mandatory)
+
+After **all** finding fix tasks are complete:
+
+1. **Re-invoke each reviewer that had findings**, passing:
+   - The original review report path (so they can compare)
+   - The findings tracker with resolutions
+   - Flag: `re_review: true`
+2. Each reviewer will:
+   - Verify each original finding is actually fixed
+   - Check that fixes didn't introduce new issues
+   - Mark findings as `verified` or `still_open`
+   - Report any new findings discovered
+3. **Update findings tracker** with verification results:
+
+```markdown
+| CR-001 | requirements | high | Missing user export feature | Developer | T015 | verified | Implemented CSV/JSON export in src/services/export.ts |
+| CR-002 | security | critical | SQL injection in query.ts:42 | Developer | T016 | verified | Replaced with parameterized query |
+| CR-005 | security | medium | New: Missing input validation on export params | Developer | T020 | open | |
+```
+
+4. **If new findings emerge**: Loop back to Step 2 for the new findings only
+5. **If all findings are verified**: Proceed to testing phase
+
+### Step 6: Final Gate
+
+Before transitioning to the testing phase, verify:
+- [ ] All findings have Status = `verified`
+- [ ] No `open` or `resolved` (unverified) findings remain
+- [ ] Test plan has been updated for any finding-related tests
+- [ ] All review reports are preserved in `project-docs/`
+
+### Finding Status Lifecycle
+
+```
+open → resolved → verified
+         ↓
+    still_open → (new fix task created) → resolved → verified
+```
+
+### Memory Integration for Findings
+
+Store findings for cross-session tracking:
+```
+memory_add(memory_type: "test_history", content: "Code review finding {CR-ID}: {description}. Severity: {severity}. Routed to: {agent}. Resolution: {resolution}. Verified: {yes/no}.", metadata: {"category": "code-review-finding", "work_seq": "{seq}", "severity": "{severity}", "finding_id": "{CR-ID}"})
+```
+
+---
+
+### Legacy Quick Reference (Finding Routing by Reviewer)
 
 ### Requirements Reviewer
 - If `gaps_found: true`: Evaluate each gap using Gap Evaluation process above
-- Create task per gap, assign to appropriate agent (may be Design Orchestrator, Data Agent, or Developer)
+- Create task per gap, assign to appropriate agent (may be Architect, Design Orchestrator, Data Agent, or Developer)
 - Critical gaps block testing phase
 
 ### Security Reviewer
@@ -235,7 +369,8 @@ When code reviewers return results:
   - Missing API contract → Integration Design Agent → Developer
   - Missing component design → appropriate Design Agent → Developer
   - Implementation wiring only → Developer
-- All stubs must be removed before testing
+- If `consistency_violations_found: true`: Route to Developer with archetype reference
+- All stubs and consistency violations must be removed before testing
 
 ## Test Failure Routing
 
@@ -493,16 +628,22 @@ Task Manager is the **sole writer** to `project-docs/activity.log`. This is **MA
 
 ### CRITICAL: Log File Initialization
 
-**On workflow start (before any agent invocation):**
+**On workflow start — BEFORE invoking Architect or any other agent:**
 
-1. Check if `project-docs/activity.log` exists
-2. If NOT exists:
+This is the very first action Task Manager performs. No agent may be invoked until the log is ready.
+
+1. Ensure `project-docs/` directory exists
+2. Check if `project-docs/activity.log` exists
+3. If NOT exists:
    - Create the file
    - Initialize sequence counter to 0
    - Log Task Manager START entry as seq=1
-3. If exists:
+4. If exists:
    - Read last line to get current sequence number
    - Continue from last sequence + 1
+5. Log is now ready — proceed to invoke Architect (architecture phase)
+
+**This ensures all phases are logged, including architecture and design.**
 
 ### Log Format
 
@@ -650,11 +791,35 @@ If Task Manager session is interrupted:
 3. Log ERROR entries for orphaned starts with `details: "Session interrupted"`
 4. Resume with next log sequence number
 
+## Component Status Management
+
+Task Manager is responsible for updating component status in `COMPONENTS.md` at key workflow transitions.
+
+### Status Transitions
+
+| Trigger | Status Change | Action |
+|---------|--------------|--------|
+| `target {id}` command (handled by CLAUDE.md) | `pending` → `active` | Update Summary table and detail section |
+| `new work` scoped to a component (handled by CLAUDE.md) | `pending` → `active` | Update Summary table and detail section |
+| All tasks for component complete + all phases pass | `active` → `complete` | Update Summary table and detail section |
+| Re-targeting a `complete` component for new work | `complete` → `active` | Update Summary table and detail section |
+
+### Completion Check
+
+When all tasks in the task list reach `complete` status and all exit criteria pass, Task Manager:
+
+1. Check if Current Work has a `**Component:**` field
+2. If yes, update that component's status to `complete` in `COMPONENTS.md`:
+   - Update the Status column in the Summary table
+   - Update the `**Status**` row in the component's detail section
+3. Log the completion in the activity log
+
 ## Outputs
 
 - `project-docs/{seq}-task-list-{short-name}.md`
 - `project-docs/activity.log` (append only)
 - Updated Claude.md (Current Work status)
+- Updated COMPONENTS.md (component status, when component-scoped work completes)
 
 ## Success Criteria
 
@@ -665,4 +830,5 @@ If Task Manager session is interrupted:
 - [ ] Chain depth never exceeds 3 levels
 - [ ] All agents followed workflow order
 - [ ] Claude.md Current Work updated to reflect completion
+- [ ] Component status updated to `complete` in COMPONENTS.md (if component-scoped)
 - [ ] User informed of any blocked tasks requiring intervention

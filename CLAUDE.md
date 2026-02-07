@@ -8,40 +8,24 @@ A development-time memory service for Claude Code that maintains context across 
 
 | Field | Value |
 |-------|-------|
-| **Seq** | 005 |
-| **Name** | NPX-Based MCP Server |
-| **Requirements** | [REQ-MEM-005-npx-mcp-server.md](requirement-docs/REQ-MEM-005-npx-mcp-server.md) |
-| **Architecture** | [005-architecture-npx-mcp.md](project-docs/005-architecture-npx-mcp.md) |
-| **Design** | [005-design-npx-mcp-server.md](design-docs/005-design-npx-mcp-server.md) |
-| **Task List** | [005-task-list-npx-mcp-server.md](project-docs/005-task-list-npx-mcp-server.md) |
-| **ADR** | [ADR-010-typescript-mcp-server.md](project-docs/adrs/ADR-010-typescript-mcp-server.md) |
-| **Status** | Implementation Complete - Ready for Testing |
+| **Seq** | 007 |
+| **Name** | Browser Details Enhancements |
+| **Requirements** | [REQ-MEM-007-browser-details-enhancements.md](requirement-docs/REQ-MEM-007-browser-details-enhancements.md) |
+| **Task List** | [007-task-list-browser-enhancements.md](project-docs/007-task-list-browser-enhancements.md) |
+| **Status** | Implementation |
 
 ### Description
 
-Replaced the Python MCP server with a TypeScript/Node.js implementation:
-- Uses official `@modelcontextprotocol/sdk`
-- npx-based invocation for reliability
-- All 23 tools implemented
-- Same backend databases (Qdrant, Neo4j)
-
-### Completed Tasks
-
-- T001-T008: Project structure, config, adapters, server setup
-- T009-T031: All 23 tools implemented
-- T032: npx entry point created
-- T046-T048: Documentation updated
-
-### Next Steps
-
-1. Test MCP server with Claude Code
-2. Run integration tests
-3. Delete Python code (T049) after verification
+Enhancements to the Memory Inspector UI and MCP Server:
+- **Inspector UI:** Expandable Details Panel, syntax highlighting, markdown rendering, project switch auto-refresh, table columns/resizing, pagination fix, graph filter fix
+- **MCP Server:** Test result cleanup, automated function extraction
 
 ## Previous Work
 
 | Seq | Name | Requirements | Status |
 |-----|------|--------------|--------|
+| 006 | Memory Inspector UI | [REQ-MEM-006-memory-inspector-ui.md](requirement-docs/REQ-MEM-006-memory-inspector-ui.md) | Implementation Complete |
+| 005 | NPX-Based MCP Server | [REQ-MEM-005-npx-mcp-server.md](requirement-docs/REQ-MEM-005-npx-mcp-server.md) | Implementation Complete |
 | 004 | MCP Tool Access Fix | [REQ-MEM-004-mcp-tool-access.md](requirement-docs/REQ-MEM-004-mcp-tool-access.md) | Abandoned - Python MCP unreliable |
 | 003 | Local MCP Architecture | [REQ-MEM-003-local-mcp-architecture.md](requirement-docs/REQ-MEM-003-local-mcp-architecture.md) | Complete |
 | 001 | Initial Memory System | [requirements-memory-docs.md](requirement-docs/requirements-memory-docs.md) | Complete |
@@ -164,21 +148,26 @@ This project uses an agentic development workflow. See `.claude/agents/` for age
 | Phase | Step | Agent(s) | Output |
 |-------|------|----------|--------|
 | **Requirements** | 1 | @requirements | Elicit and document requirements (ISO 29148) → `requirement-docs/` |
-| **Architecture** | 2 | @architect | Architectural decisions, ADRs → `project-docs/adrs/` |
-| **Design** | 3 | @requirements-analyzer | Parse requirements structure |
-| | 4 | @design-orchestrator | Coordinate specialized design agents |
-| | 4a | └─ Foundation | @ui-ux-design, @data-design, @security-design (parallel) |
-| | 4b | └─ Core | @library-design, @backend-design (parallel) |
-| | 4c | └─ Application | @frontend-design, @agent-design (parallel) |
-| | 4d | └─ Integration | @integration-design |
-| | 4e | └─ Infrastructure | @infrastructure-design |
+| **Orchestration** | 2 | @task-manager | **Orchestrates all remaining phases (2-17). Sole activity log writer.** |
+| **Architecture** | 3 | @architect | Architectural decisions, ADRs → `project-docs/adrs/` |
+| **Design** | 4 | @requirements-analyzer | Parse requirements structure |
+| | 5 | @design-orchestrator | Coordinate specialized design agents |
+| | 5a | └─ Foundation | @ui-ux-design, @data-design, @security-design (parallel) |
+| | 5b | └─ Core | @library-design, @backend-design (parallel) |
+| | 5c | └─ Application | @frontend-design, @agent-design (parallel) |
+| | 5d | └─ Integration | @integration-design |
+| | 5e | └─ Infrastructure | @infrastructure-design |
 | | | | Output: `design-docs/` with prefixed documents |
-| **Planning** | 5 | @test-designer, @data-agent | Plan tests; define schemas (parallel) |
-| | 6 | @task-manager | Create task list, orchestrate |
+| **Planning** | 6 | @test-designer, @data-agent | Plan tests; define schemas (parallel) |
+| | 6a | @task-manager | Create task list |
 | **Implementation** | 7 | @developer(s) | Implement code |
 | **Review** | 8 | Code reviewers (3) | @code-reviewer-requirements, @code-reviewer-security, @code-reviewer-integration (parallel) |
-| | 9 | @developer(s) | Fix gaps |
-| | 10 | Loop to Step 8 | Until resolved |
+| | 8a | @task-manager | Collect findings into tracker (CR-IDs), route each to correct agent |
+| | 8b | @test-designer | Assess findings for test impact, update test plan |
+| | 9 | Routed agents | Fix findings: @architect / @design-orchestrator / @developer as appropriate |
+| | 9a | @task-manager | Record resolutions in findings tracker |
+| | 10 | Code reviewers (re-review) | Verify fixes, check for new issues (only reviewers that had findings) |
+| | 10a | Loop to Step 9 | If still-open or new findings, until all verified |
 | **Test Prep** | 11 | @test-designer | Review/update test plan |
 | | 12 | @documentation, @deployment | Docs and env setup (parallel) |
 | **Testing** | 13 | @test-coder → @test-runner | Write & run tests |
@@ -253,6 +242,8 @@ Requirements include the sequence number to link them to specific work items.
 | 003 | Local MCP Architecture | | REQ-MEM-003-local-mcp-architecture.md | N/A | N/A | Complete |
 | 004 | MCP Tool Access Fix | | REQ-MEM-004-mcp-tool-access.md | N/A | N/A | Abandoned |
 | 005 | NPX-Based MCP Server | | REQ-MEM-005-npx-mcp-server.md | 005-design-npx-mcp-server.md | 005-task-list-npx-mcp-server.md | Implementation Complete |
+| 006 | Memory Inspector UI | | REQ-MEM-006-memory-inspector-ui.md | 006-design-memory-inspector.md | 006-task-list-memory-inspector.md | Implementation Complete |
+| 007 | Browser Details Enhancements | inspector-ui | REQ-MEM-007-browser-details-enhancements.md | N/A (update existing) | 007-task-list-browser-enhancements.md | Implementation |
 
 ---
 
@@ -290,21 +281,24 @@ When user says `initialize`, perform these actions **before** asking what to bui
 
 Creates a new work item without resetting existing project artifacts.
 
-1. **Determine next sequence number** from Document Sequence Tracker (3-digit zero-padded)
+1. **Determine next sequence number** from Document Sequence Tracker (3-digit zero-padded, e.g., 001 → 002 → 003)
 2. **Prompt for work description**, generate `short_name` (lowercase, hyphens, max 30 chars), confirm with user
 3. **Check for component targeting** (if `COMPONENTS.md` exists, ask if work is for a specific component)
-4. **Update Current Work section** with new seq, short_name, status=Requirements Gathering, phase=Requirements. If component-scoped, add Component field and Component Context sub-section (see Component Context rules below)
-5. **Create requirements document scaffold** in `requirement-docs/` with ISO 29148 structure
-6. **Ask user about requirements source:** upload/paste OR interview
-7. **If interview selected**, invoke @requirements agent for elicitation
-8. **Update Document Sequence Tracker** with new row
+4. **Update Current Work section** in CLAUDE.md with new seq, short_name, status=Requirements Gathering. If component-scoped, add Component field and Component Context sub-section (see Component Context rules below)
+5. **If component-scoped**, update component status to `active` in `COMPONENTS.md` (both Summary table and detail section) — follows the Component Status Lifecycle
+6. **Update Document Sequence Tracker** with new row (seq, short_name, component if targeted, status=Requirements)
+7. **Create requirements document scaffold** in `requirement-docs/` with ISO 29148 structure
+8. **Ask user about requirements source:** upload/paste OR interview
+9. **If interview selected**, invoke @requirements agent for elicitation
 
 ### `lets begin` Workflow
 
 1. **Check for requirements** in `requirement-docs/` (skip README.md and _sample-requirements.md)
 2. **If no requirements exist:** Invoke @requirements agent to collect interactively
 3. **If requirements exist:** Present summary, ask user for approval. If no, allow modifications
-4. **Once approved:** Update Current Work, invoke @architect, continue through Unified Agent Workflow (steps 2-17)
+4. **Once approved:** Update Current Work, **invoke @task-manager** to orchestrate all remaining phases (steps 2-17 of Unified Agent Workflow)
+
+**Important:** Task Manager is the orchestrator from step 2 onward. Do NOT invoke @architect or design agents directly — Task Manager invokes them so that all agent actions are logged to the activity log.
 
 ### `continue` Workflow
 
@@ -321,6 +315,28 @@ Resumes work from the current task list. **Task Manager is the primary coordinat
 **Important:** Always use `continue` to let Task Manager coordinate. Do not invoke individual agents directly.
 
 ---
+
+### Component Status Lifecycle
+
+Components follow a three-state lifecycle:
+
+```
+pending → active → complete
+```
+
+| Status | Meaning | Transition Trigger |
+|--------|---------|-------------------|
+| `pending` | Registered but no work started | Set on `add component` |
+| `active` | Currently being worked on | Set on `target {id}` or `new work` (when component-scoped) |
+| `complete` | All work finished, tests passing | Set by Task Manager when all tasks for the component are done |
+
+**Rules:**
+- `add component` always sets status to `pending`
+- `target {id}` sets status to `active` (component is now being worked on)
+- `new work` sets status to `active` when the work item is scoped to a component
+- Task Manager sets status to `complete` when the component's work item finishes all phases (implementation, review, testing all pass)
+- `untarget` does NOT revert status — once `active`, it stays `active` until completed
+- A `complete` component can be re-targeted for new work (status returns to `active`)
 
 ### Component Commands
 
@@ -346,9 +362,10 @@ Component commands require `COMPONENTS.md` at the project root. If absent: "No C
 
 1. Look up `## {id}` in `COMPONENTS.md`. If not found, show valid IDs and suggest closest match
 2. Extract all fields from component's detail section
-3. Write `**Component:** {id}` to Current Work (after Name, before Status)
-4. Write `### Component Context` sub-section with hydrated metadata
-5. Display component details. If already targeted, previous target is replaced silently
+3. **Update component status to `active`** in both the Summary table and the detail section of `COMPONENTS.md`
+4. Write `**Component:** {id}` to Current Work (after Name, before Status)
+5. Write `### Component Context` sub-section with hydrated metadata
+6. Display component details. If already targeted, previous target is replaced silently
 
 ### `show component {id}`
 
@@ -362,8 +379,9 @@ Component commands require `COMPONENTS.md` at the project root. If absent: "No C
 2. Prompt for required fields: ID (`[a-z][a-z0-9-]{0,39}`), Name, Type (frontend/backend/library/agent/gateway/infrastructure/other), Path, Description
 3. Prompt for optional fields: Language, Dependencies, Deployment, Port, Owner
 4. Validate ID uniqueness and format, warn on unknown dependency references
-5. Add row to Summary table and new H2 section to `COMPONENTS.md`
-6. Ask about scaffolding the source directory
+5. Set Status to `pending` (do NOT prompt for status — it follows the lifecycle automatically)
+6. Add row to Summary table and new H2 section to `COMPONENTS.md`
+7. Ask about scaffolding the source directory
 
 ### `impact {id}`
 

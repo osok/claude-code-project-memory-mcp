@@ -1,12 +1,21 @@
 export const MEMORY_TYPES = [
-  "requirements",
-  "design",
-  "code_pattern",
-  "component",
-  "function",
-  "test_history",
-  "session",
-  "user_preference"
+  // Documentation & Decisions
+  "requirements",      // Requirements docs, user stories, acceptance criteria
+  "design",            // Design docs, component designs, UI/UX specs
+  "architecture",      // ADRs, architecture decisions, system design
+
+  // Code Structure
+  "component",         // Components, modules, services
+  "function",          // Functions, methods, class definitions
+  "code_pattern",      // Code patterns, snippets, implementations
+
+  // Testing
+  "test_result",       // Test execution results (pass/fail, coverage, duration)
+  "test_history",      // Historical test trends, flaky tests, regressions
+
+  // Runtime
+  "session",           // Session state, phase completions
+  "user_preference"    // User preferences and customizations
 ] as const;
 
 export type MemoryType = typeof MEMORY_TYPES[number];

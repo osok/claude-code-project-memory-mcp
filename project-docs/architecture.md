@@ -7,6 +7,8 @@ This document captures cumulative architectural decisions across all project seq
 | Seq | Name | Architecture Doc |
 |-----|------|-----------------|
 | 002 | Claude Code Long-Term Memory System | 002-architecture-memory-mcp.md |
+| 005 | NPX-Based MCP Server | 005-architecture-npx-mcp.md |
+| 006 | Memory Inspector UI | 006-architecture-memory-inspector.md |
 
 ## Technology Stack
 
@@ -14,25 +16,35 @@ This document captures cumulative architectural decisions across all project seq
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| Python | 3.12+ | Primary implementation language |
+| TypeScript | 5.0+ | Primary implementation language (MCP server, Inspector) |
+| Node.js | 20+ | Runtime for MCP server and Inspector backend |
 | Qdrant | Latest | Vector database for embeddings and semantic search |
 | Neo4j | 5.x Community | Graph database for relationships and traversals |
 | Voyage-Code-3 | Current | Code-optimized embedding model |
-| Tree-sitter | 0.20+ | Universal code parsing |
 | Docker | Latest | Containerization and deployment |
 
-### Frameworks and Libraries
+### MCP Server Libraries
 
 | Library | Purpose |
 |---------|---------|
-| FastAPI | HTTP server for health/metrics endpoints |
-| pydantic | Data validation and settings management |
-| structlog | Structured JSON logging |
-| prometheus-client | Metrics exposure |
-| qdrant-client | Qdrant Python client |
-| neo4j | Neo4j Python driver |
-| voyageai | Voyage AI client |
-| tree-sitter-languages | Pre-built language grammars |
+| @modelcontextprotocol/sdk | Official MCP SDK for tool registration |
+| @qdrant/js-client-rest | Qdrant TypeScript client |
+| neo4j-driver | Neo4j TypeScript driver |
+| zod | Runtime type validation |
+| toml | Configuration file parsing |
+
+### Memory Inspector UI Libraries
+
+| Library | Purpose |
+|---------|---------|
+| React 18 | Frontend UI framework |
+| Vite | Build tool and dev server |
+| Express | Backend HTTP server |
+| React Query | Server state management |
+| Zustand | Client state management |
+| Tailwind CSS | Utility-first CSS styling |
+| Shadcn/UI | Accessible UI components |
+| vis-network | Graph visualization |
 
 ## Architectural Patterns
 
@@ -61,7 +73,7 @@ Hybrid queries decomposed into:
 
 | ADR | Title | Status |
 |-----|-------|--------|
-| ADR-001 | MCP Server Transport Mechanism | Accepted |
+| ADR-001 | MCP Server Transport Mechanism | Superseded by ADR-010 |
 | ADR-002 | Memory Storage Partitioning Strategy | Accepted |
 | ADR-003 | Embedding Pipeline Architecture | Accepted |
 | ADR-004 | Code Parsing Architecture | Accepted |
@@ -69,6 +81,9 @@ Hybrid queries decomposed into:
 | ADR-006 | Memory Normalization Process | Accepted |
 | ADR-007 | Project Structure and Module Organization | Accepted |
 | ADR-008 | Cross-Store Synchronization Strategy | Accepted |
+| ADR-009 | Local MCP Architecture | Accepted |
+| ADR-010 | TypeScript MCP Server | Accepted |
+| ADR-011 | Memory Inspector UI Architecture | Accepted |
 
 ## Quality Attribute Targets
 
@@ -112,11 +127,18 @@ Hybrid queries decomposed into:
 - Protocol: MCP (Model Context Protocol)
 - Transport: stdio
 - Configuration: .mcp.json or settings.json
+- Invocation: `npx claude-memory-mcp --project-id <id>`
+
+### Memory Inspector UI
+
+- Protocol: HTTP/REST
+- Backend: Express server on localhost:3001
+- Frontend: React SPA on localhost:5173 (dev)
+- Reuses: MCP server adapters (QdrantAdapter, Neo4jAdapter, VoyageClient)
 
 ### External Services
 
 - Voyage AI: HTTPS API for embeddings
-- Fallback: Local sentence-transformers model
 
 ## Cross-Cutting Concerns
 
@@ -142,5 +164,10 @@ Hybrid queries decomposed into:
 ## Document References
 
 - Requirements: `requirement-docs/requirements-memory-docs.md`
-- Sequence Architecture: `project-docs/002-architecture-memory-mcp.md`
+- MCP Server Requirements: `requirement-docs/REQ-MEM-005-npx-mcp-server.md`
+- Inspector UI Requirements: `requirement-docs/REQ-MEM-006-memory-inspector-ui.md`
+- Sequence Architectures:
+  - `project-docs/002-architecture-memory-mcp.md`
+  - `project-docs/005-architecture-npx-mcp.md`
+  - `project-docs/006-architecture-memory-inspector.md`
 - ADRs: `project-docs/adrs/ADR-*.md`

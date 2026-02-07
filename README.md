@@ -101,6 +101,46 @@ Replace `/path/to/` with the actual absolute path to this repository. Use a uniq
 
 After adding, restart Claude Code. The 23 memory tools are automatically discovered via MCP -- no changes needed to your project's `CLAUDE.md`.
 
+## Memory Inspector UI
+
+A web-based UI for browsing, searching, and managing memories stored by the MCP server.
+
+### Prerequisites
+
+- Databases running (see Quick Start above)
+- Global config at `~/.config/claude-memory/config.toml` (same as the MCP server)
+
+### Running the Inspector
+
+```bash
+cd inspector-ui
+npm install
+npm run dev
+```
+
+This starts both the API server (port 3002) and the frontend dev server (port 5173). Open **http://localhost:5173** in your browser.
+
+To start them individually:
+
+```bash
+# Backend API only
+npm run dev:server
+
+# Frontend only
+npm run dev:client
+```
+
+### Configuration
+
+The Inspector reads database credentials from the same `~/.config/claude-memory/config.toml` used by the MCP server. You can override settings with environment variables or a `.env` file (copy `.env.example`):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `INSPECTOR_PORT` | `3002` | Backend API port |
+| `INSPECTOR_PROJECT_ID` | `default` | Default project to display |
+
+The UI supports switching between projects at runtime via the project selector.
+
 ## Documentation
 
 | Document | Description |
@@ -240,6 +280,11 @@ node /path/to/claude-code-project-memory-mcp/mcp-server/bin/claude-memory-mcp.js
 │   │   └── utils/        # Logging utilities
 │   ├── package.json
 │   └── tsconfig.json
+├── inspector-ui/         # Memory Inspector web UI
+│   ├── src/              # React frontend (Vite + TailwindCSS)
+│   ├── server/           # Express backend API
+│   ├── package.json
+│   └── vite.config.ts
 ├── docker/               # Database docker-compose
 ├── project-docs/         # Architecture and design docs
 ├── user-docs/            # User documentation
